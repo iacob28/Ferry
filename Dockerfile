@@ -10,7 +10,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY ferry ./ferry
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir ".[media]"
 
 LABEL org.opencontainers.image.title="Ferry" \
       org.opencontainers.image.description="Offload cameras, drones and 3D printers to network storage"

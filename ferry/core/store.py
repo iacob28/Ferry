@@ -35,6 +35,8 @@ SCHEMA_VERSION = 2
 
 
 LIBRARY_COLUMNS = "camera, path, created, size, dest, synced_at, provider, dest_id, cred_id"
+VIDEO_EXTENSIONS = ("mp4", "mov", "avi", "mts", "mkv", "insv", "360")
+_IS_VIDEO = "(" + " OR ".join(f"lower(path) LIKE '%.{ext}'" for ext in VIDEO_EXTENSIONS) + ")"
 
 
 class Store:
@@ -128,9 +130,19 @@ class Store:
             rows = self._db.execute("SELECT * FROM runs ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
         return [dict(r) for r in rows]
 
-    def library(self, offset: int = 0, limit: int = 60, provider: str | None = None) -> tuple[list[dict], int]:
-        """Synced files, newest capture first. `id` is the SQLite rowid, used in media URLs."""
-        where, args = ("WHERE provider = ?", [provider]) if provider else ("", [])
+    def library(self, offset: int = 0, limit: int = 60, provider: str | None = None,
+                kind: str | None = None) -> tuple[list[dict], int]:
+        """Synced files, newest capture first. `id` is the SQLite rowid, used in media URLs.
+
+        `kind` is "video" or "photo" (anything that is not a video), judged by the extension.
+        """
+        clauses, args = [], []
+        if provider:
+            clauses.append("provider = ?")
+            args.append(provider)
+        if kind in ("video", "photo"):
+            clauses.append(_IS_VIDEO if kind == "video" else f"NOT {_IS_VIDEO}")
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         with self._lock:
             rows = self._db.execute(
                 f"SELECT rowid AS id, {LIBRARY_COLUMNS} FROM files {where}"

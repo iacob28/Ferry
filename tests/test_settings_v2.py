@@ -119,6 +119,20 @@ def test_store_migrates_an_old_database(tmp_path):
     Store(db)  # Idempotent.
 
 
+def test_library_filters_by_kind(tmp_path):
+    store = Store(tmp_path / "state.db")
+    store.mark_synced("C1", "100GOPRO/GX01.MP4", 3, 10, "a/GX01.MP4")
+    store.mark_synced("C1", "100GOPRO/GOPR02.JPG", 2, 10, "a/GOPR02.JPG")
+    store.mark_synced("bambu:P1", "timelapse/video_1.avi", 1, 10, "b/video_1.avi", provider="bambu")
+    names = lambda items: [i["path"].rsplit("/", 1)[-1] for i in items]
+    videos, total = store.library(kind="video")
+    assert (names(videos), total) == (["GX01.MP4", "video_1.avi"], 2)
+    photos, total = store.library(kind="photo")
+    assert (names(photos), total) == (["GOPR02.JPG"], 1)
+    assert names(store.library(provider="bambu", kind="video")[0]) == ["video_1.avi"]
+    assert store.library(kind="bogus")[1] == 3
+
+
 @pytest.fixture
 def client(tmp_path):
     lib = tmp_path / "nas"

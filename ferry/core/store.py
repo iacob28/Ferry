@@ -29,6 +29,15 @@ CREATE TABLE IF NOT EXISTS runs (
     bytes INTEGER NOT NULL DEFAULT 0,
     error TEXT
 );
+CREATE TABLE IF NOT EXISTS failures (
+    camera TEXT NOT NULL,
+    path TEXT NOT NULL,
+    created INTEGER NOT NULL,
+    size INTEGER NOT NULL,
+    runs INTEGER NOT NULL,
+    error TEXT,
+    PRIMARY KEY (camera, path, created, size)
+);
 """
 # `camera` holds the device id. Non-GoPro providers prefix theirs ("usb:...", "bambu:...") so ids never clash.
 SCHEMA_VERSION = 2
@@ -96,6 +105,30 @@ class Store:
                 " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (camera, path, created, size, dest, int(time.time()), provider, dest_id, cred_id),
             )
+            self._db.commit()
+
+    def failed_runs(self, camera: str, path: str, created: int, size: int) -> int:
+        with self._lock:
+            row = self._db.execute(
+                "SELECT runs FROM failures WHERE camera = ? AND path = ? AND created = ? AND size = ?",
+                (camera, path, created, size),
+            ).fetchone()
+        return row[0] if row else 0
+
+    def note_failure(self, camera: str, path: str, created: int, size: int, error: str) -> int:
+        with self._lock:
+            self._db.execute(
+                "INSERT INTO failures (camera, path, created, size, runs, error) VALUES (?, ?, ?, ?, 1, ?)"
+                " ON CONFLICT (camera, path, created, size) DO UPDATE SET runs = runs + 1, error = excluded.error",
+                (camera, path, created, size, error),
+            )
+            self._db.commit()
+        return self.failed_runs(camera, path, created, size)
+
+    def clear_failure(self, camera: str, path: str, created: int, size: int) -> None:
+        with self._lock:
+            self._db.execute("DELETE FROM failures WHERE camera = ? AND path = ? AND created = ? AND size = ?",
+                             (camera, path, created, size))
             self._db.commit()
 
     def is_deleted(self, camera: str, path: str, created: int, size: int) -> bool:

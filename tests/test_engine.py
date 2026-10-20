@@ -130,6 +130,53 @@ async def test_delete_switched_on_later_clears_files_synced_before(env):
     assert cam.deleted == []
 
 
+class BrokenSource(FakeSource):
+    """Some files can never be read (a corrupt file on the card)."""
+
+    def __init__(self, files, broken):
+        super().__init__(files)
+        self.broken = set(broken)
+        self.tries: dict[str, int] = {}
+
+    async def download(self, media, dest, on_bytes):
+        if media.name in self.broken:
+            self.tries[media.name] = self.tries.get(media.name, 0) + 1
+            raise SourceError("502")
+        return await super().download(media, dest, on_bytes)
+
+
+@pytest.fixture
+def no_retry_wait(monkeypatch):
+    async def instant(_):
+        pass
+    monkeypatch.setattr("ferry.core.engine.asyncio.sleep", instant)
+
+
+async def test_a_broken_file_is_skipped_and_given_up_after_three_runs(env, no_retry_wait):
+    store, library, _, make, logs = env
+    cam = BrokenSource({"A.MP4": b"a", "BAD.MP4": b"b", "C.MP4": b"c"}, {"BAD.MP4"})
+    for _ in range(3):
+        result = await make().run(cam, HERO)
+        assert "BAD.MP4" in (result.problem or "")
+    assert (library / "2025/2025-09-26/A.MP4").exists() and (library / "2025/2025-09-26/C.MP4").exists()
+    assert cam.tries["BAD.MP4"] == 3 * 4  # Every run retries it a few times.
+
+    result = await make().run(cam, HERO)  # Given up: no longer downloaded or reported.
+    assert cam.tries["BAD.MP4"] == 12 and result.problem is None
+    assert any("not trying 1 file(s)" in msg for _, msg in logs)
+
+
+async def test_files_failing_back_to_back_still_fail_the_run(env, no_retry_wait):
+    store, _, _, make, _ = env
+    cam = BrokenSource({"A.MP4": b"a", "B.MP4": b"b", "C.MP4": b"c"}, {"A.MP4", "B.MP4"})
+    with pytest.raises(SourceError):
+        await make().run(cam, HERO)
+    assert "C.MP4" not in cam.tries
+    # A dropped link is not held against the second file.
+    assert store.failed_runs(HERO.id, "100GOPRO/A.MP4", DAY, 1) == 1
+    assert store.failed_runs(HERO.id, "100GOPRO/B.MP4", DAY, 1) == 0
+
+
 async def test_thumbnails_saved_and_backfilled_without_failing_the_sync(env, tmp_path):
     store, library, _, make, logs = env
     thumbs = tmp_path / "thumbs"

@@ -1,0 +1,14 @@
+# Optional: publish the UI through a Traefik instance on the same host.
+#   docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d
+# The app uses host networking, so Traefik reaches it through the gateway of its own
+# Docker network (TRAEFIK_UPSTREAM, e.g. http://172.19.0.1:8780).
+services:
+  gopro-sync:
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.gopro-sync.rule=Host(`${GOPRO_SYNC_DOMAIN:?set GOPRO_SYNC_DOMAIN}`)
+      - traefik.http.routers.gopro-sync.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}
+      - traefik.http.routers.gopro-sync.tls=true
+      - traefik.http.routers.gopro-sync.tls.certresolver=${TRAEFIK_CERTRESOLVER:-}
+      - traefik.http.routers.gopro-sync.service=gopro-sync
+      - traefik.http.services.gopro-sync.loadbalancer.server.url=${TRAEFIK_UPSTREAM:?set TRAEFIK_UPSTREAM}

@@ -1,0 +1,6 @@
+# Build from source instead of pulling the released image:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+services:
+  gopro-sync:
+    build: .
+    image: gopro-sync:dev

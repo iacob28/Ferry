@@ -115,10 +115,17 @@ class SyncEngine:
         self.log("info", f"{len(media)} files on the device, {len(pending)} new "
                          f"({self.progress.total_bytes / 1e9:.1f} GB)")
         await self._backfill_thumbnails(source, device_id, [m for m in media if m not in pending])
+        # Synced in an earlier run (before deleting was switched on, or the link dropped while
+        # deleting) and still on the device: deleted too, once the target still holds them.
+        leftovers = [m for m in media if m not in pending
+                     and not self.store.is_deleted(device_id, m.path, m.created, _key_size(m))]
         if not pending:
+            result = RunResult(0, 0, 0, 0)
+            if self.policy.delete_after_sync:
+                await self._delete(source, device_id, [], leftovers, result)
             self.progress.phase = "done"
             self._emit()
-            return RunResult(0, 0, 0, 0)
+            return result
 
         self.progress.phase = "transferring"
         queue: asyncio.Queue[tuple[MediaItem, Path, int] | None] = asyncio.Queue(maxsize=1)
@@ -160,21 +167,39 @@ class SyncEngine:
 
         if self.policy.delete_after_sync:
             # Only after every upload is verified, and while the device link is still up.
-            self.progress.phase = "deleting"
-            self._emit()
-            for m, size in uploaded:
-                try:
-                    await source.delete(m)
-                except SourceError as exc:
-                    self.log("warning", f"could not delete {m.path} from the device: {exc}")
-                    continue
-                self.store.mark_deleted(device_id, m.path, m.created, _key_size(m))
-                result.deleted += 1
-            self.log("info", f"deleted {result.deleted} files from the device")
+            await self._delete(source, device_id, [m for m, _ in uploaded], leftovers, result)
 
         self.progress.phase = "done"
         self._emit()
         return result
+
+    async def _delete(self, source: MediaSource, device_id: str, uploaded: list[MediaItem],
+                      leftovers: list[MediaItem], result: RunResult) -> None:
+        verified = list(uploaded)
+        for m in leftovers:
+            rel = self.store.dest_of(device_id, m.path, m.created, _key_size(m))
+            try:
+                remote = await self.destination.stat(rel) if rel else None
+            except DestinationError as exc:
+                self.log("warning", f"cannot check {rel} on the target, keeping it on the device: {exc}")
+                continue
+            if remote is None or (m.size is not None and remote.size != m.size):
+                self.log("warning", f"{m.path} is no longer on the target as {rel}, keeping it on the device")
+                continue
+            verified.append(m)
+        if not verified:
+            return
+        self.progress.phase = "deleting"
+        self._emit()
+        for m in verified:
+            try:
+                await source.delete(m)
+            except SourceError as exc:
+                self.log("warning", f"could not delete {m.path} from the device: {exc}")
+                continue
+            self.store.mark_deleted(device_id, m.path, m.created, _key_size(m))
+            result.deleted += 1
+        self.log("info", f"deleted {result.deleted} files from the device")
 
     async def _download(self, source: MediaSource, m: MediaItem, local: Path) -> int:
         needed = (m.size or 0) - (local.stat().st_size if local.exists() else 0)

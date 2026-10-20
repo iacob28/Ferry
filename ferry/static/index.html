@@ -210,6 +210,8 @@
   .btn.primary:not(:has(i)) { padding: 12px 22px; }
   .btn.primary.sm { padding: 4px 4px 4px 14px; }
   .btn.primary.sm i { width: 24px; height: 24px; font-size: 13px; }
+  .btn.primary.sm:not(:has(i)) { padding: 7px 14px; }
+  .device > .btn, .device > .tag { flex-shrink: 0; }
   .btn.ghost { background: transparent; box-shadow: none; }
   .btn.ghost:hover:not(:disabled) { background: var(--surface-2); }
   .btn.danger { color: var(--err); }
@@ -1143,7 +1145,7 @@ const PROVIDER_UI = {
     const found = ui.found === null ? "" : ui.found === "loading" ? `<div class="skeleton"></div>` : ui.found.length
       ? ui.found.map((c) => `<div class="device"><div class="ico"><i class="ph ph-broadcast"></i></div>
           <div class="meta"><div class="name">${esc(c.name || "GoPro")}</div><div class="sub mono">${esc(c.address)}, ${c.rssi} dBm</div></div>
-          ${c.paired ? `<span class="tag">${esc(t("paired"))}</span>` : `<button type="button" class="btn primary sm" data-pair="${esc(c.address)}" data-name="${esc(c.name)}">${esc(t("pair"))}</button>`}</div>`).join("")
+          ${c.paired ? `<span class="tag">${esc(t("paired"))}</span>` : `<button type="button" class="btn primary sm" data-pair="${esc(c.address)}" data-name="${esc(c.name)}"><i class="ph ph-link"></i>${esc(t("pair"))}</button>`}</div>`).join("")
       : `<div class="empty"><i class="ph ph-magnifying-glass"></i>${esc(t("noneFound"))}</div>`;
     return `<div class="group-label"><i class="ph ph-usb"></i><span>${esc(t("connectedUsb"))}</span></div><div class="devices">${usb}</div>
       <div class="group-label" style="margin-top: 18px"><i class="ph ph-bluetooth"></i><span>${esc(t("pairedBle"))}</span></div>

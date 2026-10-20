@@ -29,6 +29,8 @@ class Destination(ABC):
     kind: str
     # Credential kinds this destination can log in with (empty: it needs none).
     credential_kinds: frozenset[str] = frozenset()
+    # "range_read", "presigned_url" (presigned_url(key) gives a link the browser can fetch directly).
+    capabilities: frozenset[str] = frozenset()
 
     @abstractmethod
     def describe(self, key: str = "") -> str: ...

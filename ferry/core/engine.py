@@ -82,8 +82,10 @@ def _with_suffix(rel: str, created: int) -> str:
 class SyncEngine:
     def __init__(self, store: Store, policy: SyncPolicy, destination: Destination, staging: Path,
                  log: Callable[[str, str], None], on_progress: Callable[[Progress], None],
-                 thumbs: Path | None = None):
+                 thumbs: Path | None = None, mirrors: list[Destination] | None = None):
         self.store = store
+        # Every file must reach all of them before it counts as synced (and may be deleted).
+        self.mirrors = list(mirrors or [])
         self.thumbs = thumbs
         self.policy = policy
         self.destination = destination
@@ -240,15 +242,23 @@ class SyncEngine:
             self.log("info", f"{rel} already on target, skipping upload")
             self.progress.uploaded_bytes += size
         else:
-            remote = await self.destination.put(local, rel, self._count_upload)
-            if remote is None or remote.size != size:
-                found = remote.size if remote else None
-                raise DestinationError(f"{rel}: target has {found} bytes, expected {size}")
+            await self._put_verified(self.destination, local, rel, size, self._count_upload)
+        for mirror in self.mirrors:
+            existing = await mirror.stat(rel)
+            if existing is None or existing.size != size:
+                await self._put_verified(mirror, local, rel, size, lambda n: None)
         self.store.mark_synced(device.id, m.path, m.created, _key_size(m), rel,
                                provider=device.provider, dest_id=self.policy.destination,
                                cred_id=self.policy.credentials)
         self.progress.current_upload = ""
         return already_there, rel
+
+    async def _put_verified(self, destination: Destination, local: Path, rel: str, size: int,
+                            on_bytes: Callable[[int], None]) -> None:
+        remote = await destination.put(local, rel, on_bytes)
+        if remote is None or remote.size != size:
+            found = remote.size if remote else None
+            raise DestinationError(f"{destination.describe(rel)}: has {found} bytes, expected {size}")
 
     async def _keep_alive_loop(self, keep_alive: Callable[[], Awaitable[None]]) -> None:
         while True:

@@ -182,9 +182,10 @@ class SyncService:
 
         policy = settings.effective(session.provider, session.device)
         destination = resolve_destination(settings, policy.destination, policy.credentials)
+        mirrors = [resolve_destination(settings, m) for m in policy.mirrors if m != policy.destination]
         return SyncEngine(self.store, policy, destination, self.staging,
                           lambda level, msg: self.log(level, f"{session.camera or session.name}: {msg}"), on_progress,
-                          self.thumbs)
+                          self.thumbs, mirrors)
 
     def identify(self, session: Session, device_id: str, label: str) -> tuple[str, str]:
         """Records who the device turned out to be, once connected."""

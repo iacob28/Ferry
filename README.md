@@ -13,14 +13,15 @@ Supported sources:
 
 - **Bambu Lab 3D printers** (P1S, P1P, X1, A1): print timelapses from the SD card.
 
-In progress: cloud destinations (S3 / Cloudflare R2, Google Drive). Ferry was called GoPro Sync
-until 0.2.0.
+Destinations: SMB shares (Synology, QNAP, TrueNAS, Windows, Samba), local folders, S3-compatible
+object storage (Amazon S3, Cloudflare R2, Backblaze B2, MinIO, Wasabi) and Google Drive. Ferry was
+called GoPro Sync until 0.2.0.
 
 - **USB**: the camera shows up as a USB network device; any number of cameras in parallel.
 - **Wireless**: the server notices a paired camera over Bluetooth, turns on its Wi-Fi,
   joins it and downloads the media. One camera per Wi-Fi radio at a time.
-- **Destinations**: SMB shares (Synology, QNAP, TrueNAS, Windows, Samba) or a local folder.
-  Hosts and shares on the network can be discovered from the UI.
+- **Destinations**: SMB shares, local folders, S3 / R2 and Google Drive, set up once and shared
+  by every device. Hosts and shares on the network can be discovered from the UI.
 - **Web UI** in English and Romanian, with an admin password, live progress per camera,
   history and logs.
 
@@ -133,6 +134,23 @@ the sync rules. The rules are layered, and each layer only overrides what it set
 
 Every field in the provider and device editors shows the value it inherits until you switch on
 *Override*, and a preview shows exactly where a file would land.
+
+**Also copy to** sends every file to more destinations as well, for example the NAS plus an R2
+bucket as an off-site copy. A file only counts as synced, and is only deleted from the device,
+once every destination has it.
+
+### Cloud destinations
+
+- **S3 / R2**: endpoint (`https://<account id>.r2.cloudflarestorage.com` for R2, empty for
+  Amazon S3), bucket, optional prefix, and an access key. Every request is signed over its
+  content's SHA-256, so the provider rejects damaged parts; files over 16 MB go up as multipart
+  uploads that only appear once complete. The library streams straight from the bucket through
+  presigned links.
+- **Google Drive**: create an OAuth client of type *TVs and Limited Input devices* in Google
+  Cloud Console (with the Drive API enabled), add it under Credentials, Google account, and
+  press *Connect*: Ferry shows a code to enter at google.com/device. Ferry uses the `drive.file`
+  scope, so it only sees what it created, starting with its folder in My Drive (`Ferry` by
+  default). Uploads are resumable and checked against Drive's MD5.
 
 ## How files are organised
 

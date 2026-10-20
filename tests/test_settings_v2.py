@@ -69,7 +69,7 @@ def test_layers_resolve_field_by_field_with_origin():
     assert (p.destination, p.credentials, p.path, p.folder_template, p.delete_after_sync) == \
         ("nas", "printer", "Action/{provider}", "{device}/{year}", True)
     assert p.origin == {"destination": "global", "credentials": "device", "path": "provider",
-                        "folder_template": "device", "delete_after_sync": "provider"}
+                        "folder_template": "device", "delete_after_sync": "provider", "mirrors": "global"}
     p2 = s.effective("gopro", "gopro:2")
     assert (p2.destination, p2.delete_after_sync, p2.origin["delete_after_sync"]) == ("usb", False, "device")
     other = s.effective("bambu")

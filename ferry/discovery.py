@@ -18,8 +18,11 @@ MDNS_SERVICES = {
     "_afpovertcp._tcp.local.": "afp",
     "_webdav._tcp.local.": "webdav",
     "_sftp-ssh._tcp.local.": "sftp",
+    "_ssh._tcp.local.": "sftp",
+    "_ftp._tcp.local.": "ftp",
 }
-SWEEP_PORTS = {445: "smb", 2049: "nfs", 548: "afp"}
+SWEEP_PORTS = {445: "smb", 2049: "nfs", 548: "afp", 22: "sftp", 21: "ftp", 990: "ftps"}
+DEFAULT_PORTS = {"sftp": 22, "ftp": 21, "ftps": 990}
 CONNECT_TIMEOUT = 0.6
 SWEEP_CONCURRENCY = 256
 MAX_SWEEP_HOSTS = 1024
@@ -46,6 +49,7 @@ class NetworkHost:
     address: str
     name: str | None = None
     services: list[str] = field(default_factory=list)
+    ports: dict[str, int] = field(default_factory=dict)  # Only where a service answers on a non-standard port.
 
 
 # --- interface / subnet selection -------------------------------------------------
@@ -128,7 +132,8 @@ def _instance_name(full: str, service_type: str) -> str:
     return name.rstrip(".")
 
 
-async def _mdns(found: dict[str, tuple[str | None, set[str]]], timeout: float) -> None:
+async def _mdns(found: dict[str, tuple[str | None, set[str]]], timeout: float,
+                ports: dict[str, dict[str, int]] | None = None) -> None:
     try:
         from zeroconf import IPVersion, ServiceStateChange
         from zeroconf.asyncio import AsyncServiceBrowser, AsyncServiceInfo, AsyncZeroconf
@@ -147,7 +152,10 @@ async def _mdns(found: dict[str, tuple[str | None, set[str]]], timeout: float) -
             if ip.is_loopback or ip.is_link_local or ip.is_unspecified:
                 continue
             prev_name, services = found.setdefault(addr, (None, set()))
-            services.add(MDNS_SERVICES[service_type])
+            service = MDNS_SERVICES[service_type]
+            services.add(service)
+            if ports is not None and info.port and info.port != DEFAULT_PORTS.get(service, info.port):
+                ports.setdefault(addr, {})[service] = info.port
             if prev_name is None and friendly:
                 found[addr] = (friendly, services)
 
@@ -211,9 +219,10 @@ async def _reverse_dns(address: str) -> str | None:
 async def discover_hosts(timeout: float = 4.0) -> list[NetworkHost]:
     """Find hosts offering file services: mDNS browse plus a TCP sweep of local subnets."""
     mdns_found: dict[str, tuple[str | None, set[str]]] = {}
+    mdns_ports: dict[str, dict[str, int]] = {}
     sweep_found: dict[str, set[str]] = {}
     tasks = [
-        asyncio.ensure_future(_mdns(mdns_found, timeout)),
+        asyncio.ensure_future(_mdns(mdns_found, timeout, mdns_ports)),
         asyncio.ensure_future(_sweep(sweep_found)),
     ]
     _, still = await asyncio.wait(tasks, timeout=timeout + 1.0)
@@ -222,6 +231,8 @@ async def discover_hosts(timeout: float = 4.0) -> list[NetworkHost]:
     await asyncio.gather(*tasks, return_exceptions=True)
 
     hosts = _merge(mdns_found, sweep_found)
+    for host in hosts:
+        host.ports = mdns_ports.get(host.address, {})
     unnamed = [h for h in hosts if h.name is None]
     if unnamed:
         names = await asyncio.gather(*(_reverse_dns(h.address) for h in unnamed))

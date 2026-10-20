@@ -98,6 +98,14 @@ class Store:
             )
             self._db.commit()
 
+    def is_deleted(self, camera: str, path: str, created: int, size: int) -> bool:
+        with self._lock:
+            row = self._db.execute(
+                "SELECT deleted_from_camera FROM files WHERE camera = ? AND path = ? AND created = ? AND size = ?",
+                (camera, path, created, size),
+            ).fetchone()
+        return bool(row and row[0])
+
     def mark_deleted(self, camera: str, path: str, created: int, size: int) -> None:
         with self._lock:
             self._db.execute(

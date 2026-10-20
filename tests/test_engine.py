@@ -113,6 +113,23 @@ async def test_delete_only_when_enabled(env):
     assert result.deleted == 1
 
 
+async def test_delete_switched_on_later_clears_files_synced_before(env):
+    store, library, settings, make, logs = env
+    cam = FakeSource({"GX010001.MP4": b"a", "GX010002.MP4": b"b"})
+    await make().run(cam, HERO)
+    (library / "2025/2025-09-26/GX010002.MP4").unlink()  # No longer on the target: keep it.
+
+    deleting = settings.model_copy(update={"defaults": settings.defaults.model_copy(update={"delete_after_sync": True})})
+    result = await make(deleting).run(cam, HERO)
+    assert cam.deleted == ["100GOPRO/GX010001.MP4"]
+    assert result.deleted == 1
+    assert any("no longer on the target" in msg for _, msg in logs)
+
+    cam.deleted.clear()  # A camera that failed to delete keeps listing the file; deleted ones are not retried.
+    await make(deleting).run(cam, HERO)
+    assert cam.deleted == []
+
+
 async def test_thumbnails_saved_and_backfilled_without_failing_the_sync(env, tmp_path):
     store, library, _, make, logs = env
     thumbs = tmp_path / "thumbs"

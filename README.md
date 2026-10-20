@@ -101,6 +101,20 @@ Capture dates come from the file name where the camera encodes it (`DJI_20261020
 Low-resolution proxies (`.LRF`, `.LRV`) and thumbnails stay on the device; the list of file
 types is configurable.
 
+### SD cards
+
+Put a card in a USB card reader and Ferry treats it like the device it came from:
+
+| Card from | Recognised by | Synced as |
+| --- | --- | --- |
+| GoPro | `DCIM/100GOPRO`, serial in `MISC/version.txt` | that camera: GoPro rules and device rules, and the same "already synced" record, so files already offloaded over USB/Wi-Fi are not copied again |
+| Bambu Lab printer | a `timelapse` folder | the printer (when one printer is set up): its rules and record |
+| DJI, Insta360, other cameras | `DCIM` layout | a USB drive: adopt it once, with its own rules |
+
+The server's built-in SD slot is off by default (a Raspberry Pi may boot from it). To use it,
+add the `b 179:* rmw` device rule in `docker-compose.yml` and switch on *Built-in SD slot* in
+the USB provider settings.
+
 ### Bambu Lab printers
 
 Under Devices, **Add printer**: *Find printers on the network* fills in the IP address and serial

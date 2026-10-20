@@ -180,7 +180,7 @@ class SyncService:
             session.progress = progress
             self.events.publish({"type": "progress", "session": session.id, "progress": progress.snapshot()})
 
-        policy = settings.effective(session.provider, session.device)
+        policy = settings.effective(session.rules or session.provider, session.device)
         destination = resolve_destination(settings, policy.destination, policy.credentials)
         mirrors = [resolve_destination(settings, m) for m in policy.mirrors if m != policy.destination]
         return SyncEngine(self.store, policy, destination, self.staging,

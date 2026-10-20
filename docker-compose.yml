@@ -14,6 +14,9 @@ services:
     # USB disks only (sd*, block major 8); the Pi's own SD card (mmcblk) stays out of reach.
     device_cgroup_rules:
       - "b 8:* rmw"
+      # Built-in SD slot (mmcblk): add only if the host does not boot from it, and switch on
+      # "Built-in SD slot" in the USB provider settings.
+      # - "b 179:* rmw"
     # Docker's default AppArmor profile blocks D-Bus calls to bluetoothd.
     security_opt:
       - apparmor:unconfined

@@ -204,3 +204,117 @@ async def test_photo_without_exif_preview_gets_an_ffmpeg_thumbnail(tmp_path):
     src = FolderSource(tmp_path / "cam")
     (item,) = await src.list_media()
     assert (await src.thumbnail(item)).startswith(b"\xff\xd8")
+
+
+# --- SD cards in a card reader ------------------------------------------------------------
+
+
+def _card_service(tmp_path, settings_extra):
+    from ferry.providers.bambu import BambuProvider
+    from ferry.providers.gopro import GoProProvider
+
+    store = SettingsStore(tmp_path / "settings.json")
+    store.save(Settings.model_validate({
+        "version": 2,
+        "destinations": [{"id": "nas", "type": "local", "path": str(tmp_path / "nas")}],
+        "defaults": {"destination": "nas"},
+        "providers": {"usbstorage": {"options": {"watch_folders": [str(tmp_path / "media")]}}},
+        **settings_extra,
+    }))
+    service = SyncService(store, Store(tmp_path / "state.db"), tmp_path,
+                          providers=[UsbStorageProvider, GoProProvider, BambuProvider])
+    return service, service.provider("usbstorage")
+
+
+async def test_gopro_card_syncs_as_its_camera_without_duplicates(tmp_path):
+    card = tmp_path / "media/GOPRO"
+    (card / "DCIM/100GOPRO").mkdir(parents=True)
+    (card / "MISC").mkdir()
+    (card / "MISC/version.txt").write_text('{\n"info version":"2.0",\n"firmware version":"HD9.01.01.72.00",\n'
+                                           '"camera type":"HERO9 Black",\n"camera serial number":"C3441325050522"\n}\n')
+    clip = card / "DCIM/100GOPRO/GX010474.MP4"
+    clip.write_bytes(b"g" * 2000)
+    os.utime(clip, (1792506612, 1792506612))
+    service, usb = _card_service(tmp_path, {
+        "providers": {"usbstorage": {"options": {"watch_folders": [str(tmp_path / "media")]}},
+                      "gopro": {"sync": {"path": "GoPro"}}},
+        "devices": [{"id": "gopro:AA", "provider": "gopro", "name": "Helmet",
+                     "config": {"address": "AA", "serial": "C3441325050522"}}],
+    })
+    nas = tmp_path / "nas/GoPro/2026/2026-10-20"
+    nas.mkdir(parents=True)
+    (nas / "GX010474.MP4").write_bytes(b"g" * 2000)  # synced earlier from the camera itself
+    await usb._poll()
+    (vol,) = usb.snapshot()["usb_volumes"]
+    assert (vol["profile"], vol["rules"], vol["device"], vol["adopt"], vol["model"]) == \
+        ("gopro", "gopro", "gopro:AA", False, "HERO9 Black")
+    await _settle(service)
+    assert sorted(p.name for p in nas.iterdir()) == ["GX010474.MP4"]  # not uploaded twice, no _suffix copy
+    # Same keys as the camera's own media list (serial, path relative to DCIM).
+    (item,), _ = service.store.library()
+    assert (item["camera"], item["path"], item["provider"], item["dest"]) == \
+        ("C3441325050522", "100GOPRO/GX010474.MP4", "gopro", "GoPro/2026/2026-10-20/GX010474.MP4")
+    run = service.store.recent_runs()[0]
+    assert (run["status"], run["camera"]) == ("ok", "Helmet")
+
+
+async def test_gopro_card_follows_the_gopro_auto_switch(tmp_path):
+    card = tmp_path / "media/GOPRO"
+    (card / "DCIM/100GOPRO").mkdir(parents=True)
+    (card / "DCIM/100GOPRO/GX010001.MP4").write_bytes(b"x")
+    service, usb = _card_service(tmp_path, {"providers": {
+        "usbstorage": {"options": {"watch_folders": [str(tmp_path / "media")]}}, "gopro": {"enabled": False}}})
+    await usb._poll()
+    (vol,) = usb.snapshot()["usb_volumes"]
+    # No MISC/version.txt: an anonymous GoPro card is adopted like any drive.
+    assert (vol["profile"], vol["adopt"]) == ("gopro", True)
+
+
+async def test_bambu_card_syncs_as_the_printer(tmp_path):
+    card = tmp_path / "media/P1S"
+    (card / "timelapse/thumbnail").mkdir(parents=True)
+    (card / "timelapse/video_2026-10-20_14-30-12.mp4").write_bytes(b"t" * 500)
+    (card / "timelapse/video_2026-10-20_14-30-12.jpg").write_bytes(b"not a video")
+    (card / "Benchy.gcode.3mf").write_bytes(b"model")
+    service, usb = _card_service(tmp_path, {
+        "providers": {"usbstorage": {"options": {"watch_folders": [str(tmp_path / "media")]}},
+                      "bambu": {"sync": {"path": "3D/{device}"}}},
+        "devices": [{"id": "bambu:01P00A1", "provider": "bambu", "name": "Workshop",
+                     "config": {"host": "10.0.0.5", "serial": "01P00A1", "access_code": "x", "model": "P1S"}}],
+    })
+    usb.service.providers["bambu"]._tick = lambda: None
+    await usb._poll()
+    (vol,) = usb.snapshot()["usb_volumes"]
+    assert (vol["profile"], vol["rules"], vol["device"], vol["adopt"]) == ("bambu", "bambu", "bambu:01P00A1", False)
+    await _settle(service)
+    assert (tmp_path / "nas/3D/Workshop/2026/2026-10-20/video_2026-10-20_14-30-12.mp4").read_bytes() == b"t" * 500
+    # The key matches what the printer's FTPS listing produces, so the printer won't send it again.
+    assert service.store.is_synced("bambu:01P00A1", "timelapse/video_2026-10-20_14-30-12.mp4", 1792506612, 500)
+
+
+async def test_bambu_card_without_a_known_printer_waits_for_adoption(tmp_path):
+    (tmp_path / "media/P1S/timelapse").mkdir(parents=True)
+    service, usb = _card_service(tmp_path, {})
+    await usb._poll()
+    (vol,) = usb.snapshot()["usb_volumes"]
+    assert (vol["profile"], vol["rules"], vol["adopt"]) == ("bambu", "bambu", True)
+    assert not service.sessions
+
+
+async def test_builtin_sd_slot_is_opt_in(tmp_path, monkeypatch):
+    block = tmp_path / "block"
+    (block / "mmcblk0/mmcblk0p1").mkdir(parents=True)
+    (block / "mmcblk0/mmcblk0p1/partition").write_text("1")
+    (block / "mmcblk0/size").write_text("1000")
+    (tmp_path / "mmc").mkdir()
+    (block / "mmcblk0/device").symlink_to(tmp_path / "mmc")
+
+    async def fake_blkid(device):
+        return {"TYPE": "vfat", "UUID": "5A5A-0001", "LABEL": "GOPRO"}
+
+    monkeypatch.setattr(detect, "SYS_BLOCK", block)
+    monkeypatch.setattr(detect.sys, "platform", "linux")
+    monkeypatch.setattr(detect, "_blkid", fake_blkid)
+    assert await detect.block_candidates() == []
+    (card,) = await detect.block_candidates(sd_slot=True)
+    assert (card.id, card.source, card.product) == ("usb:5A5A-0001", "/dev/mmcblk0p1", "SD card")

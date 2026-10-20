@@ -162,9 +162,11 @@ class SyncService:
             self.log("error", f"{session.camera or session.name}: sync failed: {exc}")
         else:
             ok = True
-            self.store.finish_run(run_id, "ok", result.files, result.bytes, camera=camera)
+            self.store.finish_run(run_id, "ok", result.files, result.bytes, result.problem, camera=camera)
             self.log("success", f"{camera}: {result.files} files, {result.bytes / 1e9:.2f} GB offloaded"
                                 + (f", {result.deleted} deleted from the device" if result.deleted else ""))
+            if result.problem:
+                self.log("warning", f"{camera}: {result.problem}")
         finally:
             if session.radio:
                 self.radios_in_use.discard(session.radio)

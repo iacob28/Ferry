@@ -21,6 +21,10 @@ STILLS = {"jpg", "jpeg", "png", "heic"}
 DECODABLE = STILLS | {"mp4", "mov", "avi", "mts", "mkv"}
 # Keep this much space free in the staging area on top of the file being downloaded.
 STAGING_RESERVE = 2 << 30
+# A file whose download fails in this many runs is left on the device and no longer tried.
+GIVE_UP_AFTER_RUNS = 3
+# This many files failing back to back means the link is down, not that the files are bad.
+FAILURE_STREAK = 2
 
 
 class SyncError(Exception):
@@ -52,6 +56,14 @@ class RunResult:
     bytes: int
     deleted: int
     skipped_existing: int
+    failed: list[str] = field(default_factory=list)  # Files left on the device after their download failed.
+
+    @property
+    def problem(self) -> str | None:
+        if not self.failed:
+            return None
+        names = ", ".join(self.failed[:3]) + (f" and {len(self.failed) - 3} more" if len(self.failed) > 3 else "")
+        return f"{len(self.failed)} file(s) could not be copied and stay on the device: {names}"
 
 
 @dataclass
@@ -110,15 +122,21 @@ class SyncEngine:
 
         media = await source.list_media()
         pending = [m for m in media if not self.store.is_synced(device_id, m.path, m.created, _key_size(m))]
+        given_up = [m for m in pending
+                    if self.store.failed_runs(device_id, m.path, m.created, _key_size(m)) >= GIVE_UP_AFTER_RUNS]
+        if given_up:
+            pending = [m for m in pending if m not in given_up]
+            self.log("warning", f"not trying {len(given_up)} file(s) that failed in {GIVE_UP_AFTER_RUNS} runs: "
+                                + ", ".join(m.name for m in given_up))
         self.progress.file_count = len(pending)
         self.progress.total_bytes = sum(m.size or 0 for m in pending)
         self.log("info", f"{len(media)} files on the device, {len(pending)} new "
                          f"({self.progress.total_bytes / 1e9:.1f} GB)")
-        await self._backfill_thumbnails(source, device_id, [m for m in media if m not in pending])
+        synced = [m for m in media if m not in pending and m not in given_up]
+        await self._backfill_thumbnails(source, device_id, synced)
         # Synced in an earlier run (before deleting was switched on, or the link dropped while
         # deleting) and still on the device: deleted too, once the target still holds them.
-        leftovers = [m for m in media if m not in pending
-                     and not self.store.is_deleted(device_id, m.path, m.created, _key_size(m))]
+        leftovers = [m for m in synced if not self.store.is_deleted(device_id, m.path, m.created, _key_size(m))]
         if not pending:
             result = RunResult(0, 0, 0, 0)
             if self.policy.delete_after_sync:
@@ -133,9 +151,25 @@ class SyncEngine:
         result = RunResult(0, 0, 0, 0)
 
         async def producer() -> None:
+            streak = 0
             for m in pending:
                 local = staging / f"{m.created}_{m.name}.part"
-                size = await self._download(source, m, local)
+                try:
+                    size = await self._download(source, m, local)
+                except SourceError as exc:
+                    streak += 1
+                    if streak >= FAILURE_STREAK:
+                        raise
+                    # One bad file (corrupt on the card, refused by the device) must not block the rest.
+                    local.unlink(missing_ok=True)
+                    self.progress.file_count -= 1
+                    self.progress.total_bytes -= m.size or 0
+                    runs = self.store.note_failure(device_id, m.path, m.created, _key_size(m), str(exc))
+                    self.log("warning", f"skipping {m.name} ({exc}); failed in {runs} of {GIVE_UP_AFTER_RUNS} runs")
+                    result.failed.append(m.name)
+                    continue
+                streak = 0
+                self.store.clear_failure(device_id, m.path, m.created, _key_size(m))
                 await queue.put((m, local, size))
             await queue.put(None)
 
@@ -222,7 +256,7 @@ class SyncEngine:
             actual = local.stat().st_size
             if actual != size:
                 local.unlink(missing_ok=True)
-                raise SyncError(f"{m.name}: downloaded {actual} bytes, expected {size}")
+                raise SourceError(f"{m.name}: downloaded {actual} bytes, expected {size}")
             if m.size is None:
                 self.progress.total_bytes += size
             return size

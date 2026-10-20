@@ -5,33 +5,27 @@ Plug a device in, or simply switch it on near the server, and every new photo an
 copied to your NAS. The app verifies each file on the destination and can then free up the
 device's storage.
 
-Supported sources:
+Sources:
 
-- **GoPro** cameras over USB or Bluetooth + Wi-Fi.
-- **Drones and cameras that connect as USB storage**: DJI (Neo and others), Insta360, any
-  camera with a `DCIM` folder, and SD card readers.
-
+- **GoPro** cameras over USB (any number in parallel) or Bluetooth + Wi-Fi: the server notices a
+  paired camera being switched on, turns on its Wi-Fi, joins it and downloads the media. Tested
+  with a HERO9 Black; cameras that speak the [Open GoPro](https://gopro.github.io/OpenGoPro/) API
+  (HERO9 and newer) should work.
+- **Drones and cameras that connect as USB storage**: DJI (Neo and others), Insta360, any camera
+  with a `DCIM` folder, and SD card readers.
 - **Bambu Lab 3D printers** (P1S, P1P, X1, A1): print timelapses from the SD card.
 
-Destinations: SMB shares (Synology, QNAP, TrueNAS, Windows, Samba), local folders, S3-compatible
-object storage (Amazon S3, Cloudflare R2, Backblaze B2, MinIO, Wasabi) and Google Drive. Ferry was
-called GoPro Sync until 0.2.0.
+Destinations, set up once and shared by every device: SMB shares (Synology, QNAP, TrueNAS,
+Windows, Samba; hosts and shares can be discovered from the UI), local folders, S3-compatible
+object storage (Amazon S3, Cloudflare R2, Backblaze B2, MinIO, Wasabi) and Google Drive.
 
-- **USB**: the camera shows up as a USB network device; any number of cameras in parallel.
-- **Wireless**: the server notices a paired camera over Bluetooth, turns on its Wi-Fi,
-  joins it and downloads the media. One camera per Wi-Fi radio at a time.
-- **Destinations**: SMB shares, local folders, S3 / R2 and Google Drive, set up once and shared
-  by every device. Hosts and shares on the network can be discovered from the UI.
-- **Web UI** in English and Romanian, with an admin password, live progress per camera,
-  history and logs.
-
-Tested with a HERO9 Black (Open GoPro API 2.0). Other cameras that speak the
-[Open GoPro](https://gopro.github.io/OpenGoPro/) API (HERO9 and newer) should work.
+The web UI (English and Romanian, admin password) shows live progress per device, a library of
+everything synced, history and logs. Ferry was called GoPro Sync until 0.2.0.
 
 ## Requirements
 
-- A Linux host for wireless offload (a Raspberry Pi 4/5 is ideal) with Docker and BlueZ
-  (`sudo apt install bluez`). USB offload works on any Docker host that sees USB devices.
+- A Linux host (a Raspberry Pi 4/5 is ideal) with Docker; BlueZ (`sudo apt install bluez`) for
+  wireless GoPro offload. Printers and cloud destinations only need the network.
 - **For wireless offload, a Wi-Fi radio that is not the host's own network connection.**
   Joining a camera's access point takes the radio off your LAN. Connect the host over
   Ethernet and use the built-in Wi-Fi for cameras, or add a USB Wi-Fi adapter. The service
@@ -56,6 +50,10 @@ cameras. Settings and state live in `./data` (override with `FERRY_DATA`).
 | `FERRY_DATA` | `./data` | Host folder for settings, state and staging |
 | `FERRY_IMAGE` / `FERRY_TAG` | registry image / `latest` | Image to run |
 | `TZ` | `UTC` | Time zone for logs |
+
+To run Ferry next to an existing GoPro Sync while trying it out, give it its own `FERRY_PORT`
+and `FERRY_DATA` (a copy of the old data folder), and switch off automatic sync in its GoPro
+settings so the two don't race for the same camera.
 
 ### Upgrading from GoPro Sync
 

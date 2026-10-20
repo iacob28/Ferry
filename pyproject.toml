@@ -1,5 +1,5 @@
 [project]
-name = "ferry"
+name = "ferry-offload"
 version = "0.2.0"
 description = "Automatically offload cameras, drones and 3D printers to network storage"
 readme = "README.md"

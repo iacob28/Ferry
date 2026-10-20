@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Stre
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ValidationError
 
-from . import __version__
+from . import __version__, folders
 from .auth import COOKIE, SESSION_TTL, AuthStore
 from .core.engine import thumb_name
 from .core.service import SyncService
@@ -55,6 +55,11 @@ class SharesRequest(BaseModel):
     password: str | None = None
     # Saved credentials to fall back on for fields the form leaves empty or masked.
     credentials: str | None = None
+
+
+class MkdirRequest(BaseModel):
+    parent: str
+    name: str
 
 
 class DeviceUpdate(BaseModel):
@@ -404,6 +409,24 @@ def create_app(service: SyncService, auth: AuthStore) -> FastAPI:
         return _save_devices(remove)
 
     # --- network discovery ---------------------------------------------
+
+    # --- folders on the server (picker for local paths) ----------------------
+
+    @app.get("/api/fs/dirs")
+    async def fs_dirs(path: str = ""):
+        try:
+            listing = await asyncio.to_thread(folders.list_dirs, path or str(service.data_dir.parent))
+        except folders.FolderError as exc:
+            raise HTTPException(400, str(exc))
+        listing["shortcuts"] = await asyncio.to_thread(folders.shortcuts, service.data_dir)
+        return listing
+
+    @app.post("/api/fs/mkdir")
+    async def fs_mkdir(req: MkdirRequest):
+        try:
+            return {"path": await asyncio.to_thread(folders.make_dir, req.parent, req.name)}
+        except folders.FolderError as exc:
+            raise HTTPException(400, str(exc))
 
     @app.get("/api/discover/hosts")
     async def discover_hosts():

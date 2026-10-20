@@ -387,6 +387,17 @@
   .provider-head .sub { font-size: 12.5px; color: var(--muted); }
   .tag.warn { background: var(--warn-soft); color: var(--warn); box-shadow: none; }
   .lib-filter { margin-bottom: 18px; }
+  .crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; min-width: 0; }
+  .crumbs i { font-size: 12px; color: var(--faint); }
+  .crumbs .btn.sm { padding: 4px 8px; font-family: "Geist Mono", ui-monospace, monospace; font-size: 12px; }
+  .shortcuts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .shortcuts .tag { cursor: pointer; border: 0; font: inherit; font-size: 11.5px; display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; }
+  .shortcuts .tag i { font-size: 13px; }
+  .folder-list { max-height: 260px; overflow: auto; }
+  .folder-list .device { padding: 6px 10px; }
+  .folder-list .device .ico { width: 30px; height: 30px; }
+  .picker-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .picker-foot .mono { overflow-wrap: anywhere; }
   .lib-filter button { padding: 6px 12px; font-size: 13px; }
 </style>
 </head>
@@ -565,7 +576,7 @@ const I18N = {
     scan: "Find cameras", pairHint: "To pair, on the camera open Preferences, Connections, Connect Device, GoPro Quik App.",
     activity: "Activity", history: "History", log: "Log", networkShare: "Network share (SMB)", localFolder: "Local folder",
     server: "Server", discover: "Discover", share: "Share", browse: "Browse", username: "Username", password: "Password",
-    subfolder: "Subfolder in share", optional: "optional", path: "Path", localHelp: "A folder inside the container, usually a mounted volume.",
+    subfolder: "Subfolder in share", optional: "optional", path: "Path", localHelp: "A folder on the Ferry server (inside the container: usually a mounted volume).",
     folderLayout: "Folder layout", tplHelp: "Variables: {year} {month} {day} {date} {provider} {device} {model}.",
     folderInDest: "Folder in the destination", pathHelp: "Variables work here too, for example {provider} or {device}.",
     test: "Test", save: "Save", add: "Add", delete: "Delete", deleted: "Deleted",
@@ -663,6 +674,10 @@ const I18N = {
     ftpSecurityHelp: "FTPES upgrades port 21 to TLS; FTPS speaks TLS on 990. Plain FTP sends the password unencrypted: only on a trusted LAN. The server's certificate is pinned on first contact.",
     credSshKey: "SSH key", privateKey: "Private key", passphrase: "Passphrase",
     privateKeyHelp: "OpenSSH format (Ed25519, ECDSA or RSA). Put the matching public key in ~/.ssh/authorized_keys on the server.",
+
+    useFolder: "Use this folder", newFolder: "New folder name", create: "Create", noSubfolders: "No sub-folders here.",
+    readOnly: "read only",
+    folderPickerHelp: "These are folders on the Ferry server. In Docker, host folders appear only if they are mounted as volumes (the shortcuts above). A folder on your PC cannot be picked here: share it over SMB or SFTP and add it as that kind of destination.",
   },
   ro: {
     destination: "Destinație", files: "Fișiere", speed: "Viteză", remaining: "Timp rămas", battery: "Baterie",
@@ -672,7 +687,7 @@ const I18N = {
     scan: "Caută camere", pairHint: "Pentru asociere, pe cameră: Preferințe, Conexiuni, Conectare dispozitiv, Aplicația GoPro Quik.",
     activity: "Activitate", history: "Istoric", log: "Jurnal", networkShare: "Share de rețea (SMB)", localFolder: "Folder local",
     server: "Server", discover: "Descoperă", share: "Share", browse: "Răsfoiește", username: "Utilizator", password: "Parolă",
-    subfolder: "Subfolder în share", optional: "opțional", path: "Cale", localHelp: "Un folder din container, de obicei un volum montat.",
+    subfolder: "Subfolder în share", optional: "opțional", path: "Cale", localHelp: "Un folder de pe serverul Ferry (în container: de obicei un volum montat).",
     folderLayout: "Structura folderelor", tplHelp: "Variabile: {year} {month} {day} {date} {provider} {device} {model}.",
     folderInDest: "Folder în destinație", pathHelp: "Și aici merg variabilele, de exemplu {provider} sau {device}.",
     test: "Testează", save: "Salvează", add: "Adaugă", delete: "Șterge", deleted: "Șters",
@@ -770,6 +785,10 @@ const I18N = {
     ftpSecurityHelp: "FTPES trece portul 21 pe TLS; FTPS vorbește TLS pe 990. FTP simplu trimite parola necriptată: doar într-o rețea locală de încredere. Certificatul serverului se fixează la prima conexiune.",
     credSshKey: "Cheie SSH", privateKey: "Cheie privată", passphrase: "Parolă cheie",
     privateKeyHelp: "Format OpenSSH (Ed25519, ECDSA sau RSA). Pune cheia publică pereche în ~/.ssh/authorized_keys pe server.",
+
+    useFolder: "Folosește acest folder", newFolder: "Nume folder nou", create: "Creează", noSubfolders: "Niciun subfolder aici.",
+    readOnly: "doar citire",
+    folderPickerHelp: "Acestea sunt foldere de pe serverul Ferry. În Docker, folderele gazdei apar doar dacă sunt montate ca volume (scurtăturile de mai sus). Un folder de pe PC nu se poate alege aici: partajează-l prin SMB sau SFTP și adaugă-l ca destinație de acel tip.",
   },
 };
 const LOCALES = { en: "en-GB", ro: "ro-RO" };
@@ -1268,7 +1287,11 @@ function openProviderEditor(kind) {
   const optRows = Object.entries(p.options).map(([k, def]) => typeof def === "boolean"
     ? toggleRow(`opt-${k}`, t(`opt_${kind}_${k}`), t(`opt_${kind}_${k}_d`), opts[k])
     : `<div class="field" style="padding: 12px 0; border-top: 1px solid var(--line)"><label for="opt-${k}">${esc(t(`opt_${kind}_${k}`))}</label>
-        <input type="${typeof def === "number" ? "number" : "text"}" id="opt-${k}" value="${esc(optValue(opts[k]))}"${Array.isArray(def) ? ' class="mono"' : ""}><div class="help">${esc(t(`opt_${kind}_${k}_d`))}</div></div>`).join("");
+        ${k === "watch_folders" ? `<div class="with-btn"><input type="text" id="opt-${k}" class="mono" value="${esc(optValue(opts[k]))}">
+            <button type="button" class="btn" data-pick-folder="opt-${k}" data-append="1"><i class="ph ph-folder-open"></i>${esc(t("browse"))}</button></div>
+          <div class="picker" id="opt-${k}-picker" hidden></div>`
+        : `<input type="${typeof def === "number" ? "number" : "text"}" id="opt-${k}" value="${esc(optValue(opts[k]))}"${Array.isArray(def) ? ' class="mono"' : ""}>`}
+        <div class="help">${esc(t(`opt_${kind}_${k}_d`))}</div></div>`).join("");
   const inherited = { ...settings.defaults, credentials: null };
   const origin = Object.fromEntries(RULES.map((r) => [r.key, "global"]));
   const sync = conf.sync || {};
@@ -1406,7 +1429,10 @@ function openDestEditor(id) {
           <button type="button" class="btn" data-clear-pin="d-ftp-fp">${esc(t("clearPin"))}</button></div></div>` : ""}
       </div>
       <div class="fields" data-dest-for="local" style="margin-top: 16px">
-        <div class="field full"><label for="d-path">${esc(t("path"))}</label><input type="text" id="d-path" value="${esc(d.path)}" placeholder="/data/library">
+        <div class="field full"><label for="d-path">${esc(t("path"))}</label>
+          <div class="with-btn"><input type="text" id="d-path" class="mono" value="${esc(d.path)}" placeholder="/data/library">
+            <button type="button" class="btn" data-pick-folder="d-path"><i class="ph ph-folder-open"></i>${esc(t("browse"))}</button></div>
+          <div class="picker" id="d-path-picker" hidden></div>
           <div class="help">${esc(t("localHelp"))}</div></div>
       </div>
       <div class="fields" data-dest-for="s3" style="margin-top: 16px">
@@ -1616,6 +1642,61 @@ async function findPrinters(btn) {
   btn.disabled = false;
 }
 
+/* ---------- folder picker (folders on the server) ---------- */
+async function pickFolder(inputId, append) {
+  const input = $(`#${inputId}`), box = $(`#${inputId}-picker`);
+  const current = append ? (input.value.split(/[\s,]+/).filter(Boolean).pop() || "") : input.value.trim();
+  box.hidden = false;
+  const show = async (path) => {
+    box.innerHTML = `<div class="skeleton" style="height: 120px"></div>`;
+    let r;
+    try { r = await api(`/api/fs/dirs?${new URLSearchParams({ path })}`); }
+    catch (err) {
+      if (path) return show("");  // a typed path that does not exist: start from the default
+      box.innerHTML = `<div class="empty"><i class="ph ph-warning-circle"></i>${esc(err.message)}</div>`; return;
+    }
+    const parts = r.path.split("/").filter(Boolean);
+    const crumbs = [`<button type="button" class="btn ghost sm" data-go="/">/</button>`]
+      .concat(parts.map((p, i) => `<button type="button" class="btn ghost sm" data-go="/${esc(parts.slice(0, i + 1).join("/"))}">${esc(p)}</button>`));
+    box.innerHTML = `<div class="picker-head"><div class="crumbs">${crumbs.join(`<i class="ph ph-caret-right"></i>`)}</div>
+        <button type="button" class="btn ghost sm" data-close="${inputId}-picker">${esc(t("close"))}</button></div>
+      <div class="shortcuts">${r.shortcuts.map((sc) => `<button type="button" class="tag${sc.path === r.path ? " on" : ""}" data-go="${esc(sc.path)}">
+        <i class="ph ${sc.kind === "volume" ? "ph-hard-drives" : sc.kind === "home" ? "ph-house" : "ph-tree-structure"}"></i>${esc(sc.path)}</button>`).join("")}</div>
+      <div class="devices folder-list">
+        ${r.parent ? `<div class="device clickable" data-go="${esc(r.parent)}"><div class="ico"><i class="ph ph-arrow-bend-left-up"></i></div><div class="meta"><div class="name">..</div></div></div>` : ""}
+        ${r.dirs.length ? r.dirs.map((d) => `<div class="device clickable" data-go="${esc(d.path)}"><div class="ico"><i class="ph ph-folder"></i></div>
+          <div class="meta"><div class="name">${esc(d.name)}</div></div></div>`).join("") : `<div class="empty"><i class="ph ph-folder-dashed"></i>${esc(t("noSubfolders"))}</div>`}
+      </div>
+      <div class="with-btn"><input type="text" placeholder="${esc(t("newFolder"))}" data-new-folder>
+        <button type="button" class="btn" data-mkdir ${r.writable ? "" : "disabled"}><i class="ph ph-folder-plus"></i>${esc(t("create"))}</button></div>
+      <div class="picker-foot"><span class="small muted mono">${esc(r.path)}${r.writable ? "" : ` (${esc(t("readOnly"))})`}</span>
+        <button type="button" class="btn primary sm" data-use="${esc(r.path)}"><i class="ph ph-check"></i>${esc(t("useFolder"))}</button></div>
+      <div class="help">${esc(t("folderPickerHelp"))}</div>`;
+    box.onclick = async (e) => {
+      const el = e.target.closest("[data-go],[data-use],[data-mkdir]");
+      if (!el) return;
+      e.stopPropagation();
+      if (el.dataset.go) return show(el.dataset.go);
+      if (el.dataset.use) {
+        const chosen = el.dataset.use;
+        if (append) {
+          const list = input.value.split(/[\s,]+/).filter(Boolean);
+          if (!list.includes(chosen)) list.push(chosen);
+          input.value = list.join(", ");
+        } else input.value = chosen;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        box.hidden = true; return;
+      }
+      if ("mkdir" in el.dataset) {
+        const name = box.querySelector("[data-new-folder]").value;
+        try { const made = await post("/api/fs/mkdir", { parent: r.path, name }); show(made.path); }
+        catch (err) { toast(err.message, true); }
+      }
+    };
+  };
+  show(current);
+}
+
 /* ---------- network discovery (destination editor) ---------- */
 async function discoverHosts(btn) {
   const box = $("#d-hosts");
@@ -1724,13 +1805,14 @@ async function scanBle() {
   ui.scanning = false; renderStatus(status);
 }
 document.addEventListener("click", async (e) => {
-  const el = e.target.closest("[data-clear-pin],[data-add-printer],[data-find-printers],[data-printer],[data-adopt],[data-pair],[data-sync],[data-cancel],[data-host],[data-share],[data-close],[data-scan],[data-discover],[data-browse],[data-edit-dest],[data-edit-cred],[data-edit-provider],[data-edit-device]");
+  const el = e.target.closest("[data-pick-folder],[data-clear-pin],[data-add-printer],[data-find-printers],[data-printer],[data-adopt],[data-pair],[data-sync],[data-cancel],[data-host],[data-share],[data-close],[data-scan],[data-discover],[data-browse],[data-edit-dest],[data-edit-cred],[data-edit-provider],[data-edit-device]");
   if (!el) return;
   const d = el.dataset;
   if (d.close) { $(`#${d.close}`).hidden = true; return; }
   if (d.host) { $("#d-host").value = d.host; $("#d-hosts").hidden = true; $("#d-cred-smb").focus(); return; }
   if (d.share) { $("#d-share").value = d.share; $("#d-shares").hidden = true; return; }
   if ("scan" in d) { scanBle(); return; }
+  if (d.pickFolder) { pickFolder(d.pickFolder, !!d.append); return; }
   if (d.clearPin) { const f = $(`#${d.clearPin}`); f.value = ""; f.dataset.cleared = "1"; return; }
   if ("addPrinter" in d) { openPrinterEditor(); return; }
   if ("findPrinters" in d) { findPrinters(el); return; }

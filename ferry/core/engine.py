@@ -11,11 +11,14 @@ from pathlib import Path
 from typing import Awaitable, Callable
 
 from ..destinations import Destination, DestinationError
+from ..thumbs import video_thumbnail
 from .media import MediaItem, MediaSource, SourceError
 from .settings import SyncPolicy, template_fields
 from .store import Store
 
 DOWNLOAD_ATTEMPTS = 4
+STILLS = {"jpg", "jpeg", "png", "heic"}
+DECODABLE = STILLS | {"mp4", "mov", "avi", "mts", "mkv"}
 # Keep this much space free in the staging area on top of the file being downloaded.
 STAGING_RESERVE = 2 << 30
 
@@ -123,7 +126,7 @@ class SyncEngine:
             while (item := await queue.get()) is not None:
                 m, local, size = item
                 existed, rel = await self._upload(m, local, size, device)
-                await self._save_thumbnail(source, m, rel)
+                await self._save_thumbnail(source, m, rel, local)
                 local.unlink(missing_ok=True)
                 uploaded.append((m, size))
                 result.files += 1
@@ -206,11 +209,18 @@ class SyncEngine:
             if rel and not (self.thumbs / thumb_name(rel)).exists():
                 await self._save_thumbnail(source, m, rel)
 
-    async def _save_thumbnail(self, source: MediaSource, m: MediaItem, rel: str) -> None:
+    async def _save_thumbnail(self, source: MediaSource, m: MediaItem, rel: str, local: Path | None = None) -> None:
         if self.thumbs is None:
             return
         try:
-            data = await source.thumbnail(m)
+            try:
+                data = await source.thumbnail(m)
+            except Exception:
+                # The device has no preview: decode the staged copy instead, while it is still here.
+                ext = m.name.rsplit(".", 1)[-1].lower()
+                if local is None or ext not in DECODABLE:
+                    raise
+                data = await video_thumbnail(local, at=0 if ext in STILLS else 1.0)
             self.thumbs.mkdir(parents=True, exist_ok=True)
             (self.thumbs / thumb_name(rel)).write_bytes(data)
         except Exception as exc:  # Thumbnails are cosmetic: never fail a sync over one.

@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from typing import Awaitable, Callable
 
-from ...core.media import MediaItem, SourceError
+from ...core.media import MediaItem, SourceError, threadsafe
 from ...thumbs import EXIF_SCAN, ThumbnailError, exif_thumbnail, video_thumbnail
 from .profiles import DEFAULT_EXTENSIONS, time_from_name
 
@@ -73,7 +73,7 @@ class FolderSource:
 
     async def download(self, item: MediaItem, dest: Path, on_bytes: Callable[[int], None]) -> int:
         try:
-            return await asyncio.to_thread(self._copy, self.root / item.path, dest, on_bytes)
+            return await asyncio.to_thread(self._copy, self.root / item.path, dest, threadsafe(on_bytes))
         except OSError as exc:  # A drive unplugged mid-copy.
             raise SourceError(f"reading {item.path} failed: {exc}") from exc
 

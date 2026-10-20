@@ -46,6 +46,10 @@ class Provider(ABC):
         return {"kind": self.kind, "label": self.label, "icon": self.icon,
                 "options": self.options_model().model_dump()}
 
+    async def discover(self) -> list[dict]:
+        """Devices of this kind found on the network, for the "add device" form."""
+        raise RuntimeError(f"{self.label} has no network discovery")
+
     async def new_device(self, name: str, config: dict) -> Device:
         """Validates a device the user adds by hand (a printer by IP, ...)."""
         raise ValueError(f"{self.label} devices are added automatically")

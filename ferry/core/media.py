@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Protocol
@@ -35,3 +36,12 @@ class MediaSource(Protocol):
     async def delete(self, item: MediaItem) -> None: ...
 
     async def thumbnail(self, item: MediaItem) -> bytes: ...
+
+
+def threadsafe(on_bytes: Callable[[int], None]) -> Callable[[int], None]:
+    """Wraps a progress callback so a worker thread (to_thread copies) can call it.
+
+    The engine's callback publishes events into asyncio queues, which only the loop may touch.
+    """
+    loop = asyncio.get_running_loop()
+    return lambda n: loop.call_soon_threadsafe(on_bytes, n)

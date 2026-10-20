@@ -621,6 +621,20 @@ const I18N = {
     opt_usbstorage_auto_adopt: "Adopt new drives automatically", opt_usbstorage_auto_adopt_d: "Otherwise a new drive waits until you adopt it here.",
     opt_usbstorage_watch_folders: "Watch folders", opt_usbstorage_watch_folders_d: "Folders where the host already mounts drives, for example /media. Each sub-folder with a DCIM folder counts as a drive.",
     opt_usbstorage_extensions: "File types", opt_usbstorage_extensions_d: "Extensions to copy. Proxies (LRF, LRV) and thumbnails stay on the device.",
+    addPrinter: "Add printer", findPrinters: "Find printers on the network", searchingPrinters: "Listening for printers…",
+    printersFound: "{n} printer(s) found", noPrintersFound: "No printer answered. Check that it is on and on the same network, or enter it by hand.",
+    noPrinters: "No printer yet. Add one with its IP address and LAN access code.", printerAdded: "Printer added",
+    printerHost: "IP address", printerSerial: "Serial number", accessCode: "LAN access code",
+    accessCodeHelp: "On the printer: Settings, Network (WLAN). The code changes after a factory reset.",
+    printerHint: "Ferry copies the timelapses from the printer's SD card after each print, never while it prints. Turn on timelapse recording in Bambu Studio or on the printer.",
+    printing: "Printing {pct}%", printerPaused: "Paused at {pct}%", minutesLeft: "{n} min left", printer_IDLE: "Idle", printer_FINISH: "Print finished",
+    printer_FAILED: "Print failed", printerNoStatus: "No live status; checking on the timer", printerUnknown: "Connecting",
+    lastChecked: "checked {when}",
+    opt_bambu_auto: "Sync after each print", opt_bambu_auto_d: "Copies new timelapses once a print ends, and on the timer below.",
+    opt_bambu_poll_minutes: "Check every (minutes)", opt_bambu_poll_minutes_d: "Looks for new files while the printer is idle. 0 checks only after prints.",
+    opt_bambu_delay_after_print_seconds: "Wait after a print (seconds)", opt_bambu_delay_after_print_seconds_d: "The printer needs a moment to finish writing the timelapse.",
+    opt_bambu_folders: "Folders", opt_bambu_folders_d: "Folders on the SD card to copy from.",
+    opt_bambu_extensions: "File types", opt_bambu_extensions_d: "Extensions to copy (P1 series: mp4 or avi, depending on firmware).",
   },
   ro: {
     destination: "Destinație", files: "Fișiere", speed: "Viteză", remaining: "Timp rămas", battery: "Baterie",
@@ -691,6 +705,20 @@ const I18N = {
     opt_usbstorage_auto_adopt: "Adoptă automat dispozitivele noi", opt_usbstorage_auto_adopt_d: "Altfel, un dispozitiv nou așteaptă până îl adopți aici.",
     opt_usbstorage_watch_folders: "Foldere urmărite", opt_usbstorage_watch_folders_d: "Foldere unde serverul montează deja unitățile, de exemplu /media. Fiecare subfolder cu DCIM contează ca unitate.",
     opt_usbstorage_extensions: "Tipuri de fișiere", opt_usbstorage_extensions_d: "Extensiile copiate. Fișierele proxy (LRF, LRV) și miniaturile rămân pe dispozitiv.",
+    addPrinter: "Adaugă imprimantă", findPrinters: "Caută imprimante în rețea", searchingPrinters: "Se ascultă imprimantele…",
+    printersFound: "{n} imprimante găsite", noPrintersFound: "Nicio imprimantă n-a răspuns. Verifică dacă e pornită și în aceeași rețea, sau introdu-o manual.",
+    noPrinters: "Nicio imprimantă încă. Adaug-o cu adresa IP și codul de acces LAN.", printerAdded: "Imprimanta a fost adăugată",
+    printerHost: "Adresă IP", printerSerial: "Număr de serie", accessCode: "Cod de acces LAN",
+    accessCodeHelp: "Pe imprimantă: Setări, Rețea (WLAN). Codul se schimbă după o resetare din fabrică.",
+    printerHint: "Ferry copiază timelapse-urile de pe cardul SD al imprimantei după fiecare print, niciodată în timpul lui. Activează înregistrarea timelapse din Bambu Studio sau de pe imprimantă.",
+    printing: "Printează {pct}%", printerPaused: "Pe pauză la {pct}%", minutesLeft: "{n} min rămase", printer_IDLE: "Inactivă", printer_FINISH: "Print terminat",
+    printer_FAILED: "Print eșuat", printerNoStatus: "Fără stare live; se verifică periodic", printerUnknown: "Conectare",
+    lastChecked: "verificată {when}",
+    opt_bambu_auto: "Sincronizează după fiecare print", opt_bambu_auto_d: "Copiază timelapse-urile noi când se termină un print și la intervalul de mai jos.",
+    opt_bambu_poll_minutes: "Verifică la fiecare (minute)", opt_bambu_poll_minutes_d: "Caută fișiere noi cât imprimanta e inactivă. 0 verifică doar după printuri.",
+    opt_bambu_delay_after_print_seconds: "Așteaptă după print (secunde)", opt_bambu_delay_after_print_seconds_d: "Imprimanta are nevoie de puțin timp să termine de scris timelapse-ul.",
+    opt_bambu_folders: "Foldere", opt_bambu_folders_d: "Folderele de pe cardul SD din care se copiază.",
+    opt_bambu_extensions: "Tipuri de fișiere", opt_bambu_extensions_d: "Extensiile copiate (seria P1: mp4 sau avi, în funcție de firmware).",
   },
 };
 const LOCALES = { en: "en-GB", ro: "ro-RO" };
@@ -828,6 +856,18 @@ const PROVIDER_UI = {
       ${others.length ? `<div class="group-label" style="margin-top: 18px"><i class="ph ph-video-camera"></i><span>${esc(t("otherCameras"))}</span></div>
         <div class="devices">${others.map((d) => genericDevice(d)).join("")}</div>` : ""}`;
   },
+  bambu(s) {
+    const printers = devicesOf("bambu");
+    const rows = printers.map((d) => {
+      const st = s.printers?.[d.id];
+      const busy = st?.syncing;
+      return `<div class="device"><div class="ico"><i class="ph ph-cube"></i></div>
+        <div class="meta"><div class="name">${esc(d.name || d.id)}${d.config.model ? ` <span class="tag">${esc(d.config.model)}</span>` : ""}</div>
+        <div class="sub">${esc(printerStatus(st))}</div></div>${busy ? syncingTag() : syncBtn(d.id, "bambu")}${deviceBtn(d)}</div>`;
+    }).join("");
+    return `<div class="devices">${rows || `<div class="empty"><i class="ph ph-cube"></i>${esc(t("noPrinters"))}</div>`}</div>
+      <div style="margin-top: 12px"><button type="button" class="btn sm" data-add-printer><i class="ph ph-plus"></i>${esc(t("addPrinter"))}</button></div>`;
+  },
   usbstorage(s) {
     const vols = s.usb_volumes || [];
     const connected = new Set(vols.map((v) => v.device).filter(Boolean));
@@ -848,6 +888,19 @@ const PROVIDER_UI = {
         <div class="devices">${offline.map((d) => genericDevice(d, d.config.model || "")).join("")}</div>` : ""}`;
   },
 };
+function printerStatus(st) {
+  if (!st) return t("printerUnknown");
+  if (st.syncing) return t("syncingNow");
+  const parts = [];
+  if (["PREPARE", "RUNNING", "PAUSE", "SLICING"].includes(st.state)) {
+    parts.push(t(st.state === "PAUSE" ? "printerPaused" : "printing", { pct: st.percent ?? 0 }) + (st.job ? `, ${st.job}` : ""));
+    if (st.remaining_minutes) parts.push(t("minutesLeft", { n: st.remaining_minutes }));
+  } else if (st.connected) parts.push(t(`printer_${st.state || "IDLE"}`));
+  else parts.push(st.error || t("printerNoStatus"));
+  if (st.last_error) parts.push(`${t("vol_error")}: ${st.last_error}`);
+  else if (st.last_check) parts.push(t("lastChecked", { when: ago(st.last_check) }));
+  return parts.join(" · ");
+}
 function genericDevice(d, sub) {
   const serial = sub ?? (d.config.serial ? t("lastSeenAs", { serial: d.config.serial }) : d.id);
   return `<div class="device"><div class="ico"><i class="ph ${esc(d.config.icon || providerInfo(d.provider).icon)}"></i></div>
@@ -1168,11 +1221,16 @@ function openDeviceEditor(id) {
   const d = settings.devices.find((x) => x.id === id); if (!d) return;
   const p = providerInfo(d.provider);
   const { values: inherited, origin } = layered(d.provider);
-  const details = Object.entries(d.config).map(([k, v]) => `<div class="small"><span class="muted">${esc(k)}:</span> <span class="mono">${esc(v)}</span></div>`).join("");
+  const fields = p.device_fields || [];
+  const editable = new Set(fields.map((f) => f.key));
+  const details = Object.entries(d.config).filter(([k]) => !editable.has(k) && k !== "icon")
+    .map(([k, v]) => `<div class="small"><span class="muted">${esc(k)}:</span> <span class="mono">${esc(v)}</span></div>`).join("");
+  const configHtml = fields.map((f) => `<div class="field"><label for="cfg-${f.key}">${esc(t(f.label))}</label>
+    <input type="${f.secret ? "password" : "text"}" id="cfg-${f.key}" class="mono" value="${esc(d.config[f.key] ?? "")}" autocomplete="off"></div>`).join("");
   const model = d.config.model || p.label;
   openEditor({
     icon: p.icon, title: d.name || t("deviceSettings"),
-    body: `<div class="fields"><div class="field full"><label for="dev-name">${esc(t("name"))}</label><input type="text" id="dev-name" value="${esc(d.name)}"></div></div>
+    body: `<div class="fields"><div class="field full"><label for="dev-name">${esc(t("name"))}</label><input type="text" id="dev-name" value="${esc(d.name)}"></div>${configHtml}</div>
       <div class="toggles" style="margin-top: 10px">${toggleRow("dev-enabled", t("deviceEnabled"), t("deviceEnabledD"), d.enabled)}</div>
       <div class="section-label">${esc(t("rulesFor"))}</div><p class="small muted" style="margin: 0 0 8px">${esc(t("rulesForDeviceD", { p: p.label }))}</p>
       <div id="dev-rules">${rulesHtml(d.sync, inherited, origin, p.label)}</div>
@@ -1192,8 +1250,9 @@ function openDeviceEditor(id) {
         settings = await api(`/api/devices/${encodeURIComponent(id)}`, { method: "DELETE" });
         toast(t("removedToast"));
       } else {
+        const config = fields.length ? Object.fromEntries(fields.map((f) => [f.key, $(`#cfg-${f.key}`).value.trim()])) : null;
         settings = await api(`/api/devices/${encodeURIComponent(id)}`, { method: "PUT",
-          body: JSON.stringify({ name: $("#dev-name").value, enabled: $("#dev-enabled").checked, sync: readRules($("#dev-rules")) }) });
+          body: JSON.stringify({ name: $("#dev-name").value, enabled: $("#dev-enabled").checked, sync: readRules($("#dev-rules")), config }) });
         toast(t("saved"));
       }
       renderSettings(); if (status) renderStatus(status);
@@ -1301,6 +1360,41 @@ function openCredEditor(id) {
       toast(t("saved"));
     },
   });
+}
+
+function openPrinterEditor() {
+  openEditor({
+    icon: "ph-cube", title: t("addPrinter"),
+    body: `<div style="margin-bottom: 14px"><button type="button" class="btn sm" data-find-printers><i class="ph ph-binoculars"></i>${esc(t("findPrinters"))}</button>
+        <div class="picker" id="pr-found" hidden></div></div>
+      <div class="fields">
+        <div class="field full"><label for="pr-name">${esc(t("name"))}</label><input type="text" id="pr-name" placeholder="P1S"></div>
+        <div class="field"><label for="pr-host">${esc(t("printerHost"))}</label><input type="text" id="pr-host" class="mono" placeholder="192.168.1.50"></div>
+        <div class="field"><label for="pr-serial">${esc(t("printerSerial"))}</label><input type="text" id="pr-serial" class="mono"></div>
+        <div class="field full"><label for="pr-code">${esc(t("accessCode"))}</label><input type="password" id="pr-code" class="mono" autocomplete="off">
+          <div class="help">${esc(t("accessCodeHelp"))}</div></div>
+      </div><input type="hidden" id="pr-model">
+      <div class="hint"><i class="ph ph-info"></i><span>${esc(t("printerHint"))}</span></div>${actions()}`,
+    onSave: async () => {
+      settings = await post("/api/devices", { provider: "bambu", name: $("#pr-name").value.trim(),
+        config: { host: $("#pr-host").value.trim(), serial: $("#pr-serial").value.trim(), access_code: $("#pr-code").value.trim(), model: $("#pr-model").value } });
+      renderSettings(); if (status) renderStatus(status); toast(t("printerAdded"));
+    },
+  });
+}
+async function findPrinters(btn) {
+  const box = $("#pr-found");
+  btn.disabled = true; box.hidden = false;
+  box.innerHTML = `<div class="picker-head"><span>${esc(t("searchingPrinters"))}</span></div><div class="skeleton" style="height: 48px"></div>`;
+  try {
+    const found = await api("/api/providers/bambu/discover");
+    box.innerHTML = `<div class="picker-head"><span>${esc(found.length ? t("printersFound", { n: found.length }) : t("noPrintersFound"))}</span>
+      <button type="button" class="btn ghost sm" data-close="pr-found">${esc(t("close"))}</button></div>` +
+      found.map((p) => `<div class="device${p.added ? "" : " clickable"}" ${p.added ? "" : `data-printer="${esc(JSON.stringify(p))}"`}>
+        <div class="ico"><i class="ph ph-cube"></i></div><div class="meta"><div class="name">${esc(p.name || p.serial)}</div>
+        <div class="sub mono">${esc(p.model)} · ${esc(p.host)} · ${esc(p.serial)}</div></div>${p.added ? `<span class="tag">${esc(t("paired"))}</span>` : ""}</div>`).join("");
+  } catch (err) { box.hidden = true; toast(err.message, true); }
+  btn.disabled = false;
 }
 
 /* ---------- network discovery (destination editor) ---------- */
@@ -1411,13 +1505,20 @@ async function scanBle() {
   ui.scanning = false; renderStatus(status);
 }
 document.addEventListener("click", async (e) => {
-  const el = e.target.closest("[data-adopt],[data-pair],[data-sync],[data-cancel],[data-host],[data-share],[data-close],[data-scan],[data-discover],[data-browse],[data-edit-dest],[data-edit-cred],[data-edit-provider],[data-edit-device]");
+  const el = e.target.closest("[data-add-printer],[data-find-printers],[data-printer],[data-adopt],[data-pair],[data-sync],[data-cancel],[data-host],[data-share],[data-close],[data-scan],[data-discover],[data-browse],[data-edit-dest],[data-edit-cred],[data-edit-provider],[data-edit-device]");
   if (!el) return;
   const d = el.dataset;
   if (d.close) { $(`#${d.close}`).hidden = true; return; }
   if (d.host) { $("#d-host").value = d.host; $("#d-hosts").hidden = true; $("#d-cred").focus(); return; }
   if (d.share) { $("#d-share").value = d.share; $("#d-shares").hidden = true; return; }
   if ("scan" in d) { scanBle(); return; }
+  if ("addPrinter" in d) { openPrinterEditor(); return; }
+  if ("findPrinters" in d) { findPrinters(el); return; }
+  if (d.printer) {
+    const p = JSON.parse(d.printer);
+    $("#pr-name").value = p.name; $("#pr-host").value = p.host; $("#pr-serial").value = p.serial; $("#pr-model").value = p.model;
+    $("#pr-found").hidden = true; $("#pr-code").focus(); return;
+  }
   if ("discover" in d) { discoverHosts(el); return; }
   if ("browse" in d) { browseShares(el); return; }
   if ("editDest" in d) { openDestEditor(d.editDest); return; }

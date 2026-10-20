@@ -246,6 +246,16 @@ def create_app(service: SyncService, auth: AuthStore) -> FastAPI:
     async def providers():
         return [p.describe() for p in service.providers.values()]
 
+    @app.get("/api/providers/{kind}/discover")
+    async def provider_discover(kind: str):
+        provider = service.providers.get(kind)
+        if provider is None:
+            raise HTTPException(404, f"unknown provider {kind!r}")
+        try:
+            return await provider.discover()
+        except RuntimeError as exc:
+            raise HTTPException(409, str(exc))
+
     @app.get("/api/effective")
     async def effective(provider: str, device: str | None = None):
         settings = service.settings

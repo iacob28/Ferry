@@ -11,8 +11,10 @@ Supported sources:
 - **Drones and cameras that connect as USB storage**: DJI (Neo and others), Insta360, any
   camera with a `DCIM` folder, and SD card readers.
 
-In progress: Bambu Lab printer timelapses and cloud destinations (S3 / Cloudflare R2, Google
-Drive). Ferry was called GoPro Sync until 0.2.0.
+- **Bambu Lab 3D printers** (P1S, P1P, X1, A1): print timelapses from the SD card.
+
+In progress: cloud destinations (S3 / Cloudflare R2, Google Drive). Ferry was called GoPro Sync
+until 0.2.0.
 
 - **USB**: the camera shows up as a USB network device; any number of cameras in parallel.
 - **Wireless**: the server notices a paired camera over Bluetooth, turns on its Wi-Fi,
@@ -99,6 +101,19 @@ Capture dates come from the file name where the camera encodes it (`DJI_20261020
 `VID_20261020_143012_...`), otherwise from the file time; set `TZ` to the camera's time zone.
 Low-resolution proxies (`.LRF`, `.LRV`) and thumbnails stay on the device; the list of file
 types is configurable.
+
+### Bambu Lab printers
+
+Under Devices, **Add printer**: *Find printers on the network* fills in the IP address and serial
+number from the printer's own announcements (UDP 2021), and you add the **LAN access code** from
+the printer screen (Settings, Network). Ferry checks the code over FTPS (implicit TLS, port 990)
+and pins the printer's certificate.
+
+It follows the print state over the printer's local MQTT broker (TLS, port 8883, read only) and
+copies new timelapses from `/timelapse` a couple of minutes after a print ends, and on a timer
+while the printer is idle. It never copies while a print is running. Firmware that restricts
+third-party MQTT access only loses the live status; the timer keeps working. Turn on timelapse
+recording in Bambu Studio for the prints you want.
 
 ### Deleting from the card
 

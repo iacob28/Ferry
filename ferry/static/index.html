@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Ferry</title>
+<script>try { const th = localStorage.getItem("ferry.theme"); if (th === "light" || th === "dark") document.documentElement.dataset.theme = th; } catch {}</script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%230a84d6'/%3E%3Cpath d='M6 18h20l-3 6H9z' fill='white'/%3E%3Cpath d='M15 7v10h-6z' fill='white'/%3E%3Cpath d='M17 9v8h5z' fill='white'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/static/vendor/geist/geist.css">
 <link rel="stylesheet" href="/static/vendor/phosphor/light.css">
@@ -26,8 +27,11 @@
     --spring: cubic-bezier(.32, .72, 0, 1);
     --glass: rgb(255 255 255 / .72);
   }
+  /* Theme: follows the system unless the viewer picked one (data-theme on <html>, set before first paint). */
+  :root { color-scheme: light; }
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
       --bg: #08090b; --bg-glow: #0d1a28;
       --shell: rgb(255 255 255 / .025); --hair: rgb(255 255 255 / .07); --hair-strong: rgb(255 255 255 / .12);
       --surface: #111317; --surface-2: #171a1f; --surface-3: #1e2228; --line: rgb(255 255 255 / .07);
@@ -40,6 +44,19 @@
       --glass: rgb(17 19 23 / .72);
     }
   }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #08090b; --bg-glow: #0d1a28;
+    --shell: rgb(255 255 255 / .025); --hair: rgb(255 255 255 / .07); --hair-strong: rgb(255 255 255 / .12);
+    --surface: #111317; --surface-2: #171a1f; --surface-3: #1e2228; --line: rgb(255 255 255 / .07);
+    --text: #eef1f5; --muted: #a3acb7; --faint: #868f9b;
+    --accent: #3aa9f0; --accent-ink: #6cc0f5; --accent-soft: rgb(58 169 240 / .12); --on-accent: #04111c;
+    --ok: #45c985; --ok-soft: rgb(69 201 133 / .12); --warn: #f0b04d; --warn-soft: rgb(240 176 77 / .12); --err: #ff7b6e; --err-soft: rgb(255 123 110 / .12);
+    --core-highlight: inset 0 1px 0 rgb(255 255 255 / .05);
+    --shadow-shell: 0 1px 1px rgb(4 8 14 / .4), 0 28px 60px -30px rgb(4 8 14 / .8);
+    --shadow-lift: 0 18px 40px -20px rgb(4 8 14 / .8);
+    --glass: rgb(17 19 23 / .72);
+  }
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
   body { margin: 0; background: var(--bg); color: var(--text); min-height: 100dvh;
@@ -50,7 +67,8 @@
                              radial-gradient(48rem 28rem at 100% 0%, color-mix(in srgb, var(--bg-glow) 60%, transparent), transparent 70%); }
   body::after { content: ""; position: fixed; inset: 0; z-index: 30; pointer-events: none; opacity: .035; mix-blend-mode: multiply;
                 background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
-  @media (prefers-color-scheme: dark) { body::after { mix-blend-mode: screen; opacity: .025; } }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) body::after { mix-blend-mode: screen; opacity: .025; } }
+  :root[data-theme="dark"] body::after { mix-blend-mode: screen; opacity: .025; }
   .mono, .num { font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; letter-spacing: 0; }
   i.ph, i.ph-fill { font-size: 18px; line-height: 1; }
   [hidden] { display: none !important; }
@@ -98,6 +116,9 @@
                             font-weight: 500; display: flex; align-items: center; gap: 7px;
                             transition: background-color .4s var(--spring), color .4s var(--spring), box-shadow .4s var(--spring); }
   .seg label { padding: 8px 16px; font-size: 13.5px; }
+  #theme-seg { width: max-content; max-width: 100%; }
+  #theme-seg button { padding: 7px 14px; font-size: 13.5px; }
+  #theme-seg i { font-size: 16px; }
   .seg input { display: none; }
   .seg input:checked + label, .seg button[aria-pressed=true], .seg button[aria-selected=true] {
     background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgb(16 24 40 / .08), 0 0 0 1px var(--hair); }
@@ -182,7 +203,8 @@
                  padding: 6px 6px 6px 20px; gap: 12px; }
   .btn.primary i { order: 2; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: 16px;
                    background: rgb(255 255 255 / .14); }
-  @media (prefers-color-scheme: dark) { .btn.primary i { background: rgb(4 8 14 / .1); } }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.primary i { background: rgb(4 8 14 / .1); } }
+  :root[data-theme="dark"] .btn.primary i { background: rgb(4 8 14 / .1); }
   .btn.primary:hover:not(:disabled) { background: color-mix(in srgb, var(--text) 88%, var(--accent)); }
   .btn.primary:hover:not(:disabled) i { transform: translate(2px, -1px) scale(1.06); }
   .btn.primary:not(:has(i)) { padding: 12px 22px; }
@@ -487,6 +509,7 @@
     <div class="target-hint" data-i18n-title="defaultDestination"><i class="ph ph-hard-drives"></i><span id="target-hint"></span></div>
     <div class="seg lang" role="group" aria-label="Language"><button type="button" data-lang="en">EN</button><button type="button" data-lang="ro">RO</button></div>
     <span id="state" class="pill"><span class="live"></span><span id="state-text"></span></span>
+    <button type="button" class="btn ghost icon-btn" id="theme-toggle"><i class="ph ph-circle-half"></i></button>
     <button class="btn ghost icon-btn" id="logout" data-i18n-title="signOut"><i class="ph ph-sign-out"></i></button>
   </div>
 </header>
@@ -678,6 +701,18 @@
           </form>
         </div></div>
         <div class="panel"><div class="core">
+          <div class="panel-head"><i class="ph ph-palette"></i><h2 data-i18n="appearance">Appearance</h2></div>
+          <div class="panel-body">
+            <div class="field"><label data-i18n="theme">Theme</label>
+              <div class="seg" role="group" id="theme-seg">
+                <button type="button" data-theme-pick="system"><i class="ph ph-circle-half"></i><span data-i18n="theme_system">System</span></button>
+                <button type="button" data-theme-pick="light"><i class="ph ph-sun"></i><span data-i18n="theme_light">Light</span></button>
+                <button type="button" data-theme-pick="dark"><i class="ph ph-moon"></i><span data-i18n="theme_dark">Dark</span></button>
+              </div>
+              <div class="help" data-i18n="themeD"></div></div>
+          </div>
+        </div></div>
+        <div class="panel"><div class="core">
           <div class="panel-head"><i class="ph ph-info"></i><h2 data-i18n="about">About</h2></div>
           <div class="panel-body"><div class="about"><span class="muted" data-i18n="version">Version</span><span class="mono" id="version"></span></div></div>
         </div></div>
@@ -835,6 +870,8 @@ const I18N = {
     recentActivity: "Recent activity", allActivity: "All activity", photos: "Photos", videos: "Videos", lastSync: "Last sync",
     never: "Never", nDevices: "{n} known", nConnected: "{n} connected", nothingConnected: "Nothing connected", system: "System", about: "About", version: "Version",
     unsavedD: "You have unsaved changes. Save them or discard them before leaving this page.", discard: "Discard",
+    appearance: "Appearance", theme: "Theme", theme_system: "System", theme_light: "Light", theme_dark: "Dark",
+    themeD: "System follows your device's light or dark setting. Saved in this browser.", themeIs: "Theme: {t}. Click to change.",
     sinceStart: "Since the first sync", acrossDest: "On every destination", nWaiting: "{n} waiting to be adopted",
     nDrives: "{n} drive(s) connected", nPrinters: "{n} printer(s)", nCameras: "{n} camera(s)",
     folderPickerHelp: "These are folders on the Ferry server. In Docker, host folders appear only if they are mounted as volumes (the shortcuts above). A folder on your PC cannot be picked here: share it over SMB or SFTP and add it as that kind of destination.",
@@ -952,6 +989,8 @@ const I18N = {
     recentActivity: "Activitate recentă", allActivity: "Toată activitatea", photos: "Poze", videos: "Clipuri", lastSync: "Ultima sincronizare",
     never: "Niciodată", nDevices: "{n} cunoscute", nConnected: "{n} conectate", nothingConnected: "Nimic conectat", system: "Sistem", about: "Despre", version: "Versiune",
     unsavedD: "Ai modificări nesalvate. Salvează-le sau renunță la ele înainte să pleci de pe pagină.", discard: "Renunță",
+    appearance: "Aspect", theme: "Temă", theme_system: "Sistem", theme_light: "Luminoasă", theme_dark: "Întunecată",
+    themeD: "Sistem urmează setarea luminoasă sau întunecată a dispozitivului. Se păstrează în acest browser.", themeIs: "Temă: {t}. Apasă pentru a schimba.",
     sinceStart: "De la prima sincronizare", acrossDest: "Pe toate destinațiile", nWaiting: "{n} așteaptă să fie adoptate",
     nDrives: "{n} unități conectate", nPrinters: "{n} imprimante", nCameras: "{n} camere",
     folderPickerHelp: "Acestea sunt foldere de pe serverul Ferry. În Docker, folderele gazdei apar doar dacă sunt montate ca volume (scurtăturile de mai sus). Un folder de pe PC nu se poate alege aici: partajează-l prin SMB sau SFTP și adaugă-l ca destinație de acel tip.",
@@ -1007,6 +1046,7 @@ function applyLanguage() {
   document.querySelectorAll("[data-i18n-title]").forEach((el) => (el.title = t(el.dataset.i18nTitle)));
   document.querySelectorAll("[data-lang]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
   renderAuthCopy();
+  renderTheme();
   if (status) renderStatus(status);
   if (settings) renderSettings();
   if (lastRuns) renderRuns(lastRuns);
@@ -1015,6 +1055,26 @@ function applyLanguage() {
   if (status) renderOverview();
   showPage();
 }
+
+/* ---------- theme ---------- */
+const THEMES = ["system", "light", "dark"];
+const THEME_ICON = { system: "ph-circle-half", light: "ph-sun", dark: "ph-moon" };
+const currentTheme = () => document.documentElement.dataset.theme || "system";
+function setTheme(theme) {
+  if (theme === "system") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = theme;
+  try { theme === "system" ? localStorage.removeItem("ferry.theme") : localStorage.setItem("ferry.theme", theme); } catch {}
+  renderTheme();
+}
+function renderTheme() {
+  const theme = currentTheme();
+  $("#theme-toggle i").className = `ph ${THEME_ICON[theme]}`;
+  $("#theme-toggle").title = t("themeIs", { t: t(`theme_${theme}`) });
+  $("#theme-toggle").setAttribute("aria-label", $("#theme-toggle").title);
+  document.querySelectorAll("[data-theme-pick]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.themePick === theme)));
+}
+$("#theme-toggle").addEventListener("click", () => setTheme(THEMES[(THEMES.indexOf(currentTheme()) + 1) % THEMES.length]));
+$("#theme-seg").addEventListener("click", (e) => { const b = e.target.closest("[data-theme-pick]"); if (b) setTheme(b.dataset.themePick); });
 
 /* ---------- auth ---------- */
 function renderAuthCopy() {

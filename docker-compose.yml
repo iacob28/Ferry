@@ -1,0 +1,24 @@
+services:
+  gopro-sync:
+    image: ${GOPRO_SYNC_IMAGE:-harbor.dockerbit.com/gopro-sync/gopro-sync}:${GOPRO_SYNC_TAG:-latest}
+    container_name: gopro-sync
+    restart: unless-stopped
+    # Host networking: the service must see the camera's USB network interface,
+    # drive the Wi-Fi radios that join camera access points, and discover NAS
+    # devices over mDNS.
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    # Docker's default AppArmor profile blocks D-Bus calls to bluetoothd.
+    security_opt:
+      - apparmor:unconfined
+    environment:
+      - TZ=${TZ:-UTC}
+      - GOPRO_SYNC_PORT=${GOPRO_SYNC_PORT:-8780}
+      # Optional: preset the admin password instead of creating it in the browser.
+      - GOPRO_SYNC_PASSWORD=${GOPRO_SYNC_PASSWORD:-}
+    volumes:
+      - ${GOPRO_SYNC_DATA:-./data}:/data
+      # Bluetooth through the host's bluetoothd.
+      - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket

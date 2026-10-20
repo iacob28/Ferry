@@ -100,7 +100,9 @@
                 background: radial-gradient(circle at 30% 25%, color-mix(in srgb, var(--accent) 70%, #fff), var(--accent) 60%);
                 box-shadow: inset 0 1px 0 rgb(255 255 255 / .35), 0 6px 14px -6px var(--accent); }
   .brand-mark i { font-size: 19px; }
-  .target-hint { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 7px; min-width: 0; padding: 0 10px; }
+  .target-hint { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 7px; min-width: 0; padding: 0 10px; text-decoration: none; }
+  .target-hint:hover { color: var(--text); }
+  .target-hint.bad i { color: var(--err); }
   .target-hint span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 30ch; }
   .pill { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px;
           font-size: 13px; font-weight: 500; background: var(--surface-2); color: var(--muted); white-space: nowrap; box-shadow: inset 0 0 0 1px var(--hair); }
@@ -123,8 +125,10 @@
   .seg input:checked + label, .seg button[aria-pressed=true], .seg button[aria-selected=true] {
     background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgb(16 24 40 / .08), 0 0 0 1px var(--hair); }
   .seg button:hover, .seg label:hover { color: var(--text); }
-  .lang { padding: 3px; }
-  .lang button { font-size: 12px; font-weight: 600; padding: 5px 10px; letter-spacing: .04em; }
+  /* Type pickers in editors: equal cells that wrap into rows instead of a stretched pill. */
+  .seg.choices { display: grid; grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)); border-radius: 16px; margin-bottom: 16px; }
+  .seg.choices label { border-radius: 12px; justify-content: center; white-space: nowrap; min-width: 0; padding: 8px 10px; }
+  @media (max-width: 560px) { .seg.choices { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
   /* App layout: section navigation beside the current page. */
   .layout { max-width: 1220px; margin: 0 auto; padding: 40px 16px 96px; display: grid; grid-template-columns: 216px minmax(0, 1fr); gap: 24px; align-items: start; }
@@ -499,7 +503,6 @@
     <div class="field" id="auth-confirm-field" hidden><label for="auth-confirm" data-i18n="confirmPassword">Confirm password</label><input type="password" id="auth-confirm" autocomplete="new-password"></div>
     <div class="error-text" id="auth-error"></div>
     <button class="btn primary block" type="submit" id="auth-submit"></button>
-    <div class="seg lang" style="justify-self: center"><button type="button" data-lang="en">EN</button><button type="button" data-lang="ro">RO</button></div>
   </form></div>
 </div>
 
@@ -508,8 +511,7 @@
   <div class="topbar-inner">
     <a class="brand" href="#/overview"><div class="brand-mark"><i class="ph-fill ph-boat"></i></div><span class="brand-name">Ferry</span></a>
     <div class="spacer"></div>
-    <div class="target-hint" data-i18n-title="defaultDestination"><i class="ph ph-hard-drives"></i><span id="target-hint"></span></div>
-    <div class="seg lang" role="group" aria-label="Language"><button type="button" data-lang="en">EN</button><button type="button" data-lang="ro">RO</button></div>
+    <a class="target-hint" id="top-hint" href="#/activity"><i class="ph ph-clock-counter-clockwise"></i><span id="target-hint"></span></a>
     <span id="state" class="pill"><span class="live"></span><span id="state-text"></span></span>
     <button type="button" class="btn ghost icon-btn" id="theme-toggle"><i class="ph ph-circle-half"></i></button>
     <button class="btn ghost icon-btn" id="logout" data-i18n-title="signOut"><i class="ph ph-sign-out"></i></button>
@@ -765,7 +767,7 @@ const I18N = {
     filesSaved: "Files saved", totalSize: "Total size", devices: "Devices", connectedUsb: "Connected over USB",
     pairedBle: "Paired over Bluetooth", bleLinuxOnly: "Bluetooth works only when the service runs on Linux (for example a Raspberry Pi).",
     scan: "Find cameras", pairHint: "To pair, on the camera open Preferences, Connections, Connect Device, GoPro Quik App.",
-    activity: "Activity", history: "History", log: "Log", networkShare: "Network share (SMB)", localFolder: "Local folder",
+    activity: "Activity", history: "History", log: "Log", networkShare: "SMB share", localFolder: "Local folder",
     server: "Server", discover: "Discover", share: "Share", browse: "Browse", username: "Username", password: "Password",
     subfolder: "Subfolder in share", optional: "optional", path: "Path", localHelp: "A folder on the Ferry server (inside the container: usually a mounted volume).",
     folderLayout: "Folder layout", tplHelp: "Variables: {year} {month} {day} {date} {provider} {device} {model}.",
@@ -795,12 +797,13 @@ const I18N = {
     run_ok: "Done", run_failed: "Failed", run_running: "Running", run_cancelled: "Stopped", run_interrupted: "Interrupted",
     noRuns: "No syncs yet.", unreachable: "The service is not responding",
     searchingNet: "Searching the network…", hostsFound: "{n} hosts found", noHosts: "No file servers found on the network.",
-    smbOnly: "Only SMB servers can be picked here.", sharesOn: "Shares on {host}", noShares: "No shares visible with these credentials.",
+    protoOnly: "Only {p} servers can be picked here.", sharesOn: "Shares on {host}", noShares: "No shares visible with these credentials.",
     pickHostFirst: "Enter or discover a server first.", close: "Close", radio: "radio {r}",
     secureArea: "Admin",
     library: "Library", libCount: "{n} files", libEmpty: "Synced photos and videos appear here.", loadMore: "Load more", all: "All",
     refresh: "Refresh", previous: "Previous", next: "Next", download: "Download",
     cantPlay: "This browser cannot play this video. GoPro HEVC files (GX) play in Safari, and in Chrome or Edge with hardware decoding.",
+    nSyncing: "{n} syncing", pctDone: "{n}% done", lastSyncHint: "Last sync {when}, {what}", noSyncYet: "No sync yet",
     destinations: "Destinations", credentials: "Credentials", addCredentials: "Add credentials", defaultDestination: "Default destination",
     defaultTag: "Default", noDestinations: "No destination yet. Add the NAS or folder where media should go.",
     noCredentials: "No saved credentials. SMB shares usually need a username and password.",
@@ -878,129 +881,10 @@ const I18N = {
     nDrives: "{n} drive(s) connected", nPrinters: "{n} printer(s)", nCameras: "{n} camera(s)",
     folderPickerHelp: "These are folders on the Ferry server. In Docker, host folders appear only if they are mounted as volumes (the shortcuts above). A folder on your PC cannot be picked here: share it over SMB or SFTP and add it as that kind of destination.",
   },
-  ro: {
-    destination: "Destinație", files: "Fișiere", speed: "Viteză", remaining: "Timp rămas", battery: "Baterie",
-    startManually: "Pornește manual", syncAll: "Sincronizează toate dispozitivele", stopAll: "Oprește tot", sync: "Sincronizează", stop: "Oprește",
-    filesSaved: "Fișiere salvate", totalSize: "Volum total", devices: "Dispozitive", connectedUsb: "Conectate prin USB",
-    pairedBle: "Asociate prin Bluetooth", bleLinuxOnly: "Bluetooth funcționează doar când serviciul rulează pe Linux (de exemplu pe un Raspberry Pi).",
-    scan: "Caută camere", pairHint: "Pentru asociere, pe cameră: Preferințe, Conexiuni, Conectare dispozitiv, Aplicația GoPro Quik.",
-    activity: "Activitate", history: "Istoric", log: "Jurnal", networkShare: "Share de rețea (SMB)", localFolder: "Folder local",
-    server: "Server", discover: "Descoperă", share: "Share", browse: "Răsfoiește", username: "Utilizator", password: "Parolă",
-    subfolder: "Subfolder în share", optional: "opțional", path: "Cale", localHelp: "Un folder de pe serverul Ferry (în container: de obicei un volum montat).",
-    folderLayout: "Structura folderelor", tplHelp: "Variabile: {year} {month} {day} {date} {provider} {device} {model}.",
-    folderInDest: "Folder în destinație", pathHelp: "Și aici merg variabilele, de exemplu {provider} sau {device}.",
-    test: "Testează", save: "Salvează", add: "Adaugă", delete: "Șterge", deleted: "Șters",
-    deleteAfter: "Șterge de pe dispozitiv după verificare", deleteAfterD: "Doar după ce fiecare fișier are aceeași dimensiune pe destinație.",
-    wifiIfaces: "Plăci Wi-Fi", wifiIfacesD: "Un dispozitiv per placă, pe rând. Niciodată conexiunea serverului la rețea.",
-    parallel: "Sincronizări în paralel", parallelD: "Toate dispozitivele împreună.",
-    security: "Securitate", currentPassword: "Parola curentă", newPassword: "Parola nouă", changePassword: "Schimbă parola",
-    confirmPassword: "Confirmă parola", signOut: "Deconectare", passwordChanged: "Parola a fost schimbată",
-    setupTitle: "Bun venit", setupSub: "Creează parola de administrator pentru acest server Ferry.", setupBtn: "Creează parola",
-    loginTitle: "Autentificare", loginSub: "Introdu parola de administrator.", loginBtn: "Intră", mismatch: "Parolele nu coincid.",
-    state_idle: "Inactiv", state_syncing: "Sincronizare", state_pairing: "Asociere", s_connecting: "Conectare", s_syncing: "Transfer",
-    loading: "Se încarcă…", idleTitle: "Totul e la zi", idlePaired: "Conectează un dispozitiv sau pornește o cameră asociată în apropiere și sincronizarea începe singură.",
-    idleUnpaired: "Conectează un dispozitiv prin USB sau asociază o cameră prin Bluetooth.", syncingTitle: "Se sincronizează {n} dispozitive",
-    syncingSub: "{done} din {total} transferate, pe toate dispozitivele.", pairingTitle: "Se asociază o cameră", pairingSub: "Ține camera pornită, în modul de asociere.",
-    usbOn: "GoPro pe {iface}", noUsb: "Nicio cameră pe USB. Conectează o cameră și pornește-o.", syncingNow: "Se sincronizează",
-    standby: "În standby", poweredOn: "Pornită", seen: "{state}, văzută {when}, {rssi} dBm", notSeen: "Încă nevăzută",
-    remove: "Elimină", noPaired: "Nicio cameră asociată încă.", of: "din", deleting: "Se șterg fișierele verificate de pe dispozitiv",
-    connectingUsb: "Se pregătește transferul pe USB", connectingBle: "Se pornește Wi-Fi-ul camerei prin Bluetooth", connectingAny: "Conectare la dispozitiv",
-    listing: "Se citește lista de fișiere",
-    now: "acum", minAgo: "acum {n} min", saved: "Setările au fost salvate", testOk: "Conexiune reușită: {target}",
-    paired: "Asociată", pair: "Asociază", noneFound: "Nicio cameră găsită. Verifică dacă e pornită și în modul de asociere.",
-    pairedToast: "Camera a fost asociată", removedToast: "Dispozitivul a fost eliminat", notSet: "nesetat",
-    usbCamera: "Dispozitiv USB", wirelessCamera: "Dispozitiv wireless", nFiles: "{n} fișiere", nothingNew: "Nimic nou",
-    mode_usb: "USB", mode_wifi: "wireless", mode_lan: "rețea",
-    run_ok: "Reușită", run_failed: "Eșuată", run_running: "În curs", run_cancelled: "Oprită", run_interrupted: "Întreruptă",
-    noRuns: "Încă nu există sincronizări.", unreachable: "Serviciul nu răspunde",
-    searchingNet: "Se caută în rețea…", hostsFound: "{n} servere găsite", noHosts: "Niciun server de fișiere găsit în rețea.",
-    smbOnly: "Aici se pot alege doar servere SMB.", sharesOn: "Share-uri pe {host}", noShares: "Niciun share vizibil cu aceste date.",
-    pickHostFirst: "Introdu sau descoperă întâi un server.", close: "Închide", radio: "placa {r}",
-    secureArea: "Administrare",
-    library: "Bibliotecă", libCount: "{n} fișiere", libEmpty: "Pozele și clipurile sincronizate apar aici.", loadMore: "Încarcă mai multe", all: "Toate",
-    refresh: "Reîmprospătează", previous: "Anterior", next: "Următor", download: "Descarcă",
-    cantPlay: "Browserul nu poate reda acest clip. Fișierele GoPro HEVC (GX) merg în Safari și în Chrome sau Edge cu decodare hardware.",
-    destinations: "Destinații", credentials: "Credențiale", addCredentials: "Adaugă credențiale", defaultDestination: "Destinația implicită",
-    defaultTag: "Implicită", noDestinations: "Nicio destinație încă. Adaugă NAS-ul sau folderul unde să ajungă fișierele.",
-    noCredentials: "Nicio credențială salvată. Share-urile SMB cer de obicei utilizator și parolă.",
-    syncRules: "Reguli de sincronizare", syncRulesD: "Valori implicite pentru toate dispozitivele. Fiecare furnizor și fiecare dispozitiv le poate suprascrie.",
-    newDestination: "Destinație nouă", editDestination: "Destinație", name: "Nume", type: "Tip",
-    credNone: "Fără (acces guest)", credNew: "Credențiale noi…", newCredentials: "Credențiale noi", editCredentials: "Credențiale",
-    filesGoTo: "Fișierele ajung în", exampleFile: "pentru un fișier făcut pe 26 septembrie 2026",
-    settings: "Setări", providerSettings: "Setări {p}", deviceSettings: "Setări dispozitiv",
-    autoSync: "Sincronizare automată", autoSyncD: "Permite dispozitivelor {p} să pornească singure o sincronizare. Cele manuale merg oricând.",
-    options: "Opțiuni", rulesFor: "Reguli de sincronizare", rulesForProviderD: "Suprascrie regulile globale pentru toate dispozitivele {p}.",
-    rulesForDeviceD: "Suprascrie regulile globale și pe cele {p} doar pentru acest dispozitiv.",
-    override: "Suprascrie", inheritedFrom: "Din {layer}: {value}", layer_global: "regulile globale", layer_provider: "setările {p}",
-    ownCredentials: "cele ale destinației", yes: "Da", no: "Nu", empty: "(gol)",
-    deviceEnabled: "Sincronizează automat acest dispozitiv", deviceEnabledD: "Când e oprit, se sincronizează doar când apeși Sincronizează.",
-    details: "Detalii", forget: "Elimină dispozitivul", otherCameras: "Camere cunoscute", noDevices: "Niciun dispozitiv încă.",
-    lastSeenAs: "Serie {serial}", unsavedChanges: "Salvează întâi",
-    opt_gopro_usb: "Sincronizare automată pe USB", opt_gopro_usb_d: "Pornește când o cameră e conectată prin cablu.",
-    opt_gopro_ble: "Sincronizare automată wireless", opt_gopro_ble_d: "Pornește când o cameră asociată e pornită în apropiere.",
-    opt_gopro_sleep_after_sync: "Standby la final", opt_gopro_sleep_after_sync_d: "Oprește camera după o sincronizare wireless.",
-    opt_gopro_cooldown_minutes: "Pauză wireless", opt_gopro_cooldown_minutes_d: "Minute între două sincronizări wireless ale aceleiași camere.",
-    provider_usbstorage: "Drone și camere USB", cardOf: "card {p}, sincronizat după regulile {p}", adopt: "Adoptă", adoptSync: "Adoptă și sincronizează", newDrive: "Nou",
-    noDrives: "Nimic conectat. Conectează o dronă sau o cameră prin USB (DJI Neo: USB-C) ori pune cardul SD într-un cititor.",
-    knownDrives: "Dispozitive cunoscute", vol_checking: "Se verifică", vol_ready: "Conectat", vol_done: "Sincronizat, poate fi deconectat", vol_error: "Eroare",
-    opt_usbstorage_auto: "Sincronizează la conectare", opt_usbstorage_auto_d: "Dispozitivele adoptate încep sincronizarea imediat ce sunt conectate.",
-    opt_usbstorage_auto_adopt: "Adoptă automat dispozitivele noi", opt_usbstorage_auto_adopt_d: "Altfel, un dispozitiv nou așteaptă până îl adopți aici.",
-    opt_usbstorage_watch_folders: "Foldere urmărite", opt_usbstorage_watch_folders_d: "Foldere unde serverul montează deja unitățile, de exemplu /media. Fiecare subfolder cu DCIM contează ca unitate.",
-    opt_usbstorage_extensions: "Tipuri de fișiere", opt_usbstorage_extensions_d: "Extensiile copiate. Fișierele proxy (LRF, LRV) și miniaturile rămân pe dispozitiv.",
-    opt_usbstorage_sd_slot: "Slotul SD încorporat", opt_usbstorage_sd_slot_d: "Urmărește și slotul SD al serverului (necesită regula de dispozitiv b 179:*). Lasă-l oprit pe un Raspberry Pi care pornește de pe cardul SD.",
-    addPrinter: "Adaugă imprimantă", findPrinters: "Caută imprimante în rețea", searchingPrinters: "Se ascultă imprimantele…",
-    printersFound: "{n} imprimante găsite", noPrintersFound: "Nicio imprimantă n-a răspuns. Verifică dacă e pornită și în aceeași rețea, sau introdu-o manual.",
-    noPrinters: "Nicio imprimantă încă. Adaug-o cu adresa IP și codul de acces LAN.", printerAdded: "Imprimanta a fost adăugată",
-    printerHost: "Adresă IP", printerSerial: "Număr de serie", accessCode: "Cod de acces LAN",
-    accessCodeHelp: "Pe imprimantă: Setări, Rețea (WLAN). Codul se schimbă după o resetare din fabrică.",
-    printerHint: "Ferry copiază timelapse-urile de pe cardul SD al imprimantei după fiecare print, niciodată în timpul lui. Activează înregistrarea timelapse din Bambu Studio sau de pe imprimantă.",
-    printing: "Printează {pct}%", printerPaused: "Pe pauză la {pct}%", minutesLeft: "{n} min rămase", printer_IDLE: "Inactivă", printer_FINISH: "Print terminat",
-    printer_FAILED: "Print eșuat", printerNoStatus: "Fără stare live; se verifică periodic", printerUnknown: "Conectare",
-    lastChecked: "verificată {when}",
-    opt_bambu_auto: "Sincronizează după fiecare print", opt_bambu_auto_d: "Copiază timelapse-urile noi când se termină un print și la intervalul de mai jos.",
-    opt_bambu_poll_minutes: "Verifică la fiecare (minute)", opt_bambu_poll_minutes_d: "Caută fișiere noi cât imprimanta e inactivă. 0 verifică doar după printuri.",
-    opt_bambu_delay_after_print_seconds: "Așteaptă după print (secunde)", opt_bambu_delay_after_print_seconds_d: "Imprimanta are nevoie de puțin timp să termine de scris timelapse-ul.",
-    opt_bambu_folders: "Foldere", opt_bambu_folders_d: "Folderele de pe cardul SD din care se copiază.",
-    opt_bambu_extensions: "Tipuri de fișiere", opt_bambu_extensions_d: "Extensiile copiate (seria P1: mp4 sau avi, în funcție de firmware).",
-    objectStorage: "S3 / R2", googleDrive: "Google Drive", endpoint: "Endpoint",
-    endpointHelp: "Cloudflare R2: https://<account id>.r2.cloudflarestorage.com. Gol pentru Amazon S3; merg și MinIO, Backblaze B2 și Wasabi.",
-    bucket: "Bucket", region: "Regiune", prefix: "Folder (prefix) în bucket", accessKey: "Cheie de acces", keyId: "ID cheie de acces", secretKey: "Cheie secretă",
-    accessKeyHelp: "Pentru R2: R2, Manage API tokens, Object Read & Write pe bucket.",
-    googleAccount: "Cont Google", googleAccountHelp: "Adaugă întâi un cont Google la Credențiale (îți trebuie propriul client OAuth).",
-    driveFolder: "Folder în My Drive", driveFolderHelp: "Ferry îl creează; vede doar folderele și fișierele create de el.",
-    credPick: "Alege…", credPassword: "Utilizator și parolă", credAccessKey: "Cheie de acces", credGoogle: "Cont Google",
-    oauthClientId: "ID client OAuth", oauthClientSecret: "Secret client OAuth",
-    oauthHelp: "În Google Cloud Console: activează Google Drive API, apoi Credentials, Create OAuth client ID, tip \"TVs and Limited Input devices\". Lipește aici ID-ul și secretul, salvează, apoi conectează.",
-    googleConnect: "Conectează contul Google", googleReconnect: "Conectează din nou", googleConnected: "Conectat ca {account}", googleConnectedShort: "Conectat",
-    googleNotConnected: "Neconectat încă", googleCodeStep: "Deschide pagina pe orice dispozitiv, autentifică-te și introdu codul:",
-    googleWaiting: "Se așteaptă aprobarea…",
-    alsoCopyTo: "Copiază și în", alsoCopyToD: "Fiecare fișier ajunge și în aceste destinații (de exemplu un backup off-site). Un fișier e considerat sincronizat, și poate fi șters de pe dispozitiv, doar după ce e în toate.",
-    none: "niciuna",
-    sftp: "SFTP", ftp: "FTP / FTPS", port: "Port", remoteFolder: "Folder pe server",
-    remoteFolderHelp: "Dacă începe cu / e absolut; altfel e în folderul home al utilizatorului.",
-    sftpCredHelp: "Un utilizator cu parolă sau cu cheie SSH (cheile se adaugă la Credențiale).",
-    pinnedKey: "Cheia serverului fixată", pinnedCert: "Certificat fixat", clearPin: "Șterge",
-    ftpSecurity: "Securitate", ftp_explicit: "FTPES (TLS)", ftp_implicit: "FTPS (portul 990)", ftp_none: "FTP simplu",
-    ftpSecurityHelp: "FTPES trece portul 21 pe TLS; FTPS vorbește TLS pe 990. FTP simplu trimite parola necriptată: doar într-o rețea locală de încredere. Certificatul serverului se fixează la prima conexiune.",
-    credSshKey: "Cheie SSH", privateKey: "Cheie privată", passphrase: "Parolă cheie",
-    privateKeyHelp: "Format OpenSSH (Ed25519, ECDSA sau RSA). Pune cheia publică pereche în ~/.ssh/authorized_keys pe server.",
-
-    showAll: "Arată toate {n}", showLess: "Arată mai puține", useFolder: "Folosește acest folder", newFolder: "Nume folder nou", create: "Creează", noSubfolders: "Niciun subfolder aici.",
-    readOnly: "doar citire",
-    overview: "Prezentare", more: "Mai mult", recentFiles: "Fișiere recente", viewLibrary: "Vezi biblioteca", manage: "Gestionează",
-    recentActivity: "Activitate recentă", allActivity: "Toată activitatea", photos: "Poze", videos: "Clipuri", lastSync: "Ultima sincronizare",
-    never: "Niciodată", nDevices: "{n} cunoscute", nConnected: "{n} conectate", nothingConnected: "Nimic conectat", system: "Sistem", about: "Despre", version: "Versiune",
-    unsavedD: "Ai modificări nesalvate. Salvează-le sau renunță la ele înainte să pleci de pe pagină.", discard: "Renunță",
-    appearance: "Aspect", theme: "Temă", theme_system: "Sistem", theme_light: "Luminoasă", theme_dark: "Întunecată",
-    themeD: "Sistem urmează setarea luminoasă sau întunecată a dispozitivului. Se păstrează în acest browser.", themeIs: "Temă: {t}. Apasă pentru a schimba.",
-    sinceStart: "De la prima sincronizare", acrossDest: "Pe toate destinațiile", nWaiting: "{n} așteaptă să fie adoptate",
-    nDrives: "{n} unități conectate", nPrinters: "{n} imprimante", nCameras: "{n} camere",
-    folderPickerHelp: "Acestea sunt foldere de pe serverul Ferry. În Docker, folderele gazdei apar doar dacă sunt montate ca volume (scurtăturile de mai sus). Un folder de pe PC nu se poate alege aici: partajează-l prin SMB sau SFTP și adaugă-l ca destinație de acel tip.",
-  },
 };
-const LOCALES = { en: "en-GB", ro: "ro-RO" };
-let lang = "en";
-try { const saved = localStorage.getItem("ferry.lang") ?? localStorage.getItem("gopro-sync.lang"); if (I18N[saved]) lang = saved; } catch {}
+const LOCALES = { en: "en-GB" };
+const lang = "en";  // English only; the strings stay in I18N so the copy lives in one place.
+try { localStorage.removeItem("ferry.lang"); localStorage.removeItem("gopro-sync.lang"); } catch {}
 const t = (key, vars = {}) => (I18N[lang][key] ?? I18N.en[key] ?? key).replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m));
 
 const $ = (s, root = document) => root.querySelector(s);
@@ -1046,7 +930,6 @@ function applyLanguage() {
   document.querySelectorAll("[data-i18n]").forEach((el) => (el.textContent = t(el.dataset.i18n)));
   document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => (el.placeholder = t(el.dataset.i18nPlaceholder)));
   document.querySelectorAll("[data-i18n-title]").forEach((el) => (el.title = t(el.dataset.i18nTitle)));
-  document.querySelectorAll("[data-lang]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
   renderAuthCopy();
   renderTheme();
   if (status) renderStatus(status);
@@ -1222,6 +1105,7 @@ function renderProviders(s) {
 /* ---------- status ---------- */
 function renderStatus(s) {
   status = s;
+  renderTopHint();
   const busy = s.state !== "idle";
   $("#state").className = `pill${busy ? " busy" : ""}`;
   $("#state-text").textContent = t(`state_${s.state}`);
@@ -1324,10 +1208,35 @@ function renderSessions(list) {
   }
 }
 
+// Top bar: what is moving right now, otherwise how the last sync went.
+function renderTopHint() {
+  const s = status; if (!s) return;
+  const box = $("#top-hint"), icon = box.querySelector("i");
+  let text, title, cls = "ph-clock-counter-clockwise", bad = false;
+  if (s.sessions.length) {
+    const ps = s.sessions.map((x) => sessionProgress[x.id] || x.progress || {});
+    const done = ps.reduce((a, p) => a + (p.downloaded_bytes || 0), 0), total = ps.reduce((a, p) => a + (p.total_bytes || 0), 0);
+    const rate = ps.reduce((a, p) => a + (p.download_rate || 0), 0);
+    // The state pill already says "Syncing": show how far along and how fast.
+    text = [total ? t("pctDone", { n: Math.floor((100 * done) / total) }) : t("nSyncing", { n: s.sessions.length }), rate ? `${fmtBytes(rate)}/s` : ""].filter(Boolean).join(", ");
+    title = s.sessions.map((x) => x.camera || x.name).filter(Boolean).join(", ");
+    cls = "ph-arrows-clockwise";
+  } else {
+    const last = (lastRuns || []).find((r) => r.status !== "running");
+    text = last ? t("lastSyncHint", { when: ago(last.finished_at || last.started_at), what: runTitle(last) }) : t("noSyncYet");
+    title = last ? `${runWhat(last)}${last.error ? `: ${last.error}` : ""}` : "";
+    bad = !!last && (last.status === "failed" || !!last.error);
+  }
+  $("#target-hint").textContent = text; box.title = title;
+  icon.className = `ph ${cls}`; box.classList.toggle("bad", bad);
+}
+setInterval(renderTopHint, 30000);
+
 function renderSessionProgress(id, p, sess) {
+  if (p) sessionProgress[id] = p;
+  renderTopHint();
   const el = $(`#sessions .session[data-id="${CSS.escape(id)}"]`);
   if (!el) return;
-  if (p) sessionProgress[id] = p;
   const track = el.querySelector(".track");
   const counting = p && p.phase !== "listing";
   track.classList.toggle("indeterminate", !counting);
@@ -1402,7 +1311,7 @@ function setPreview(el, p) { el.className = p.cls; el.innerHTML = p.html; }
 /* ---------- settings: destinations, credentials, global rules ---------- */
 function renderSettings() {
   const def = settings.defaults.destination;
-  $("#target-hint").textContent = $("#hero-dest").textContent = def ? describeDest(destById(def)) : t("notSet");
+  $("#hero-dest").textContent = def ? describeDest(destById(def)) : t("notSet");
   $("#dest-list").innerHTML = settings.destinations.length ? settings.destinations.map((d) => `<div class="device clickable" data-edit-dest="${esc(d.id)}">
       <div class="ico"><i class="ph ${destType(d.type).icon}"></i></div>
       <div class="meta"><div class="name">${esc(d.name || d.id)}${d.id === def ? ` <span class="tag on">${esc(t("defaultTag"))}</span>` : ""}</div>
@@ -1727,14 +1636,14 @@ function openDestEditor(id) {
   const cred = (type) => (d.type === type ? d.credentials : null);
   openEditor({
     icon: "ph-hard-drives", title: existing ? existing.name || existing.id : t("newDestination"),
-    body: `<div class="seg" style="margin-bottom: 16px; flex-wrap: wrap; display: inline-flex">${typeSeg}</div>
+    body: `<div class="seg choices">${typeSeg}</div>
       <div class="fields">
         <div class="field full"><label for="d-name">${esc(t("name"))}</label><input type="text" id="d-name" value="${esc(d.name)}" placeholder="Synology"></div>
       </div>
       <div class="fields" data-dest-for="smb" style="margin-top: 16px">
         <div class="field full"><label for="d-host">${esc(t("server"))}</label>
           <div class="with-btn"><input type="text" id="d-host" value="${esc(d.host)}" placeholder="nas.local">
-            <button type="button" class="btn" data-discover><i class="ph ph-binoculars"></i>${esc(t("discover"))}</button></div>
+            <button type="button" class="btn" data-discover="smb"><i class="ph ph-binoculars"></i>${esc(t("discover"))}</button></div>
           <div class="picker" id="d-hosts" hidden></div></div>
         <div class="field full"><label for="d-cred-smb">${esc(t("credentials"))}</label>${credSelect("d-cred-smb", "password", cred("smb"), true)}</div>
         <div class="field" data-new-cred="smb" hidden><label for="d-user">${esc(t("username"))}</label><input type="text" id="d-user"></div>
@@ -1746,8 +1655,11 @@ function openDestEditor(id) {
         <div class="field full"><label for="d-base">${esc(t("subfolder"))}</label><input type="text" id="d-base" value="${esc(d.type === "smb" ? d.base_path : "")}" placeholder="${esc(t("optional"))}"></div>
       </div>
       <div class="fields" data-dest-for="sftp" style="margin-top: 16px">
-        <div class="field"><label for="d-sftp-host">${esc(t("server"))}</label><input type="text" id="d-sftp-host" value="${esc(d.type === "sftp" ? d.host : "")}" placeholder="nas.local"></div>
+        <div class="field"><label for="d-sftp-host">${esc(t("server"))}</label>
+          <div class="with-btn"><input type="text" id="d-sftp-host" value="${esc(d.type === "sftp" ? d.host : "")}" placeholder="nas.local">
+            <button type="button" class="btn" data-discover="sftp" title="${esc(t("discover"))}"><i class="ph ph-binoculars"></i></button></div></div>
         <div class="field"><label for="d-sftp-port">${esc(t("port"))}</label><input type="number" id="d-sftp-port" value="${esc(d.type === "sftp" && d.port ? d.port : "")}" placeholder="22"></div>
+        <div class="picker" id="d-sftp-hosts" style="grid-column: 1 / -1" hidden></div>
         <div class="field full"><label for="d-cred-sftp">${esc(t("credentials"))}</label>${credSelect("d-cred-sftp", ["password", "ssh_key"], cred("sftp"), true)}
           <div class="help">${esc(t("sftpCredHelp"))}</div></div>
         <div class="field" data-new-cred="sftp" hidden><label for="d-sftp-user">${esc(t("username"))}</label><input type="text" id="d-sftp-user"></div>
@@ -1758,11 +1670,14 @@ function openDestEditor(id) {
           <button type="button" class="btn" data-clear-pin="d-sftp-fp">${esc(t("clearPin"))}</button></div></div>` : ""}
       </div>
       <div class="fields" data-dest-for="ftp" style="margin-top: 16px">
-        <div class="field full"><label>${esc(t("ftpSecurity"))}</label><div class="seg" style="display: inline-flex">
+        <div class="field full"><label>${esc(t("ftpSecurity"))}</label><div class="seg choices" style="margin-bottom: 0">
           ${["explicit", "implicit", "none"].map((m) => `<input type="radio" name="ftp-tls" value="${m}" id="ft-${m}" ${(d.type === "ftp" ? d.ftp_tls : "explicit") === m ? "checked" : ""}><label for="ft-${m}">${esc(t(`ftp_${m}`))}</label>`).join("")}
         </div><div class="help">${esc(t("ftpSecurityHelp"))}</div></div>
-        <div class="field"><label for="d-ftp-host">${esc(t("server"))}</label><input type="text" id="d-ftp-host" value="${esc(d.type === "ftp" ? d.host : "")}" placeholder="nas.local"></div>
+        <div class="field"><label for="d-ftp-host">${esc(t("server"))}</label>
+          <div class="with-btn"><input type="text" id="d-ftp-host" value="${esc(d.type === "ftp" ? d.host : "")}" placeholder="nas.local">
+            <button type="button" class="btn" data-discover="ftp" title="${esc(t("discover"))}"><i class="ph ph-binoculars"></i></button></div></div>
         <div class="field"><label for="d-ftp-port">${esc(t("port"))}</label><input type="number" id="d-ftp-port" value="${esc(d.type === "ftp" && d.port ? d.port : "")}" placeholder="21 / 990"></div>
+        <div class="picker" id="d-ftp-hosts" style="grid-column: 1 / -1" hidden></div>
         <div class="field full"><label for="d-cred-ftp">${esc(t("credentials"))}</label>${credSelect("d-cred-ftp", "password", cred("ftp"), true)}</div>
         <div class="field" data-new-cred="ftp" hidden><label for="d-ftp-user">${esc(t("username"))}</label><input type="text" id="d-ftp-user"></div>
         <div class="field" data-new-cred="ftp" hidden><label for="d-ftp-pass">${esc(t("password"))}</label><input type="password" id="d-ftp-pass" autocomplete="new-password"></div>
@@ -1871,7 +1786,7 @@ function openCredEditor(id, kindHint) {
   const connected = c.kind === "oauth_google" && c.refresh_token;
   openEditor({
     icon: "ph-key", title: id ? credLabel(c) : t("newCredentials"),
-    body: `<div class="seg" style="margin-bottom: 16px; display: inline-flex; flex-wrap: wrap">${seg}</div>
+    body: `<div class="seg choices">${seg}</div>
       <div class="fields"><div class="field full"><label for="c-name">${esc(t("name"))}</label><input type="text" id="c-name" value="${esc(c.name)}"></div></div>
       <div class="fields" data-cred-for="password" style="margin-top: 16px">
         <div class="field"><label for="c-user">${esc(t("username"))}</label><input type="text" id="c-user" value="${esc(c.username)}"></div>
@@ -2040,23 +1955,41 @@ async function pickFolder(inputId, append) {
 }
 
 /* ---------- network discovery (destination editor) ---------- */
+// Which discovered services fit each destination type, and where the pick goes.
+const DISCOVER_FOR = {
+  smb: { services: ["smb"], box: "d-hosts", host: "d-host" },
+  sftp: { services: ["sftp"], box: "d-sftp-hosts", host: "d-sftp-host" },
+  ftp: { services: ["ftp", "ftps"], box: "d-ftp-hosts", host: "d-ftp-host" },
+};
 async function discoverHosts(btn) {
-  const box = $("#d-hosts");
+  const kind = btn.dataset.discover || "smb", spec = DISCOVER_FOR[kind], box = $(`#${spec.box}`);
   btn.disabled = true; box.hidden = false;
   box.innerHTML = `<div class="picker-head"><span>${esc(t("searchingNet"))}</span></div><div class="skeleton" style="height: 48px"></div>`;
   try {
     const hosts = await api("/api/discover/hosts");
+    const usable = (h) => h.services.some((sv) => spec.services.includes(sv));
+    // Hosts offering this protocol first; the rest stay visible but can't be picked.
+    hosts.sort((a, b) => usable(b) - usable(a));
     box.innerHTML = `<div class="picker-head"><span>${esc(hosts.length ? t("hostsFound", { n: hosts.length }) : t("noHosts"))}</span>
-      <button type="button" class="btn ghost sm" data-close="d-hosts">${esc(t("close"))}</button></div>` +
+      <button type="button" class="btn ghost sm" data-close="${spec.box}">${esc(t("close"))}</button></div>` +
       hosts.map((h) => {
-        const smb = h.services.includes("smb");
-        return `<div class="device${smb ? " clickable" : ""}" ${smb ? `data-host="${esc(h.name && !h.name.includes(" ") ? h.name : h.address)}"` : `title="${esc(t("smbOnly"))}"`}>
+        const ok = usable(h), name = h.name && !h.name.includes(" ") ? h.name : h.address;
+        const ftps = !h.services.includes("ftp") && h.services.includes("ftps");
+        const port = kind === "ftp" ? (ftps ? h.ports.ftps || 990 : h.ports.ftp) : h.ports[kind];
+        return `<div class="device${ok ? " clickable" : ""}" ${ok ? `data-host="${esc(name)}" data-kind="${kind}" data-port="${port || ""}" data-implicit="${ftps ? 1 : ""}"` : `title="${esc(t("protoOnly", { p: kind.toUpperCase() }))}"`}>
           <div class="ico"><i class="ph ph-hard-drives"></i></div>
           <div class="meta"><div class="name">${esc(h.name || h.address)}</div><div class="sub"><span class="mono">${esc(h.address)}</span></div></div>
-          <div>${h.services.map((sv) => `<span class="tag${sv === "smb" ? " on" : ""}">${esc(sv.toUpperCase())}</span>`).join("")}</div></div>`;
+          <div>${h.services.map((sv) => `<span class="tag${spec.services.includes(sv) ? " on" : ""}">${esc(sv.toUpperCase())}${h.ports[sv] ? `:${h.ports[sv]}` : ""}</span>`).join("")}</div></div>`;
       }).join("");
   } catch (err) { box.hidden = true; toast(err.message, true); }
   btn.disabled = false;
+}
+function pickHost(el) {
+  const { host, kind = "smb", port, implicit } = el.dataset, spec = DISCOVER_FOR[kind];
+  $(`#${spec.host}`).value = host; $(`#${spec.box}`).hidden = true;
+  if (kind !== "smb") $(`#d-${kind}-port`).value = port;
+  if (kind === "ftp") $(`#ft-${implicit ? "implicit" : "explicit"}`).checked = true;
+  $(`#d-cred-${kind}`).focus();
 }
 async function browseShares(btn) {
   const host = $("#d-host").value.trim();
@@ -2093,6 +2026,7 @@ function runHtml(r) {
 }
 function renderRuns(runs) {
   lastRuns = runs;
+  renderTopHint();
   const none = `<div class="empty"><i class="ph ph-clock"></i>${esc(t("noRuns"))}</div>`;
   $("#ov-runs").innerHTML = runs.length ? runs.slice(0, 5).map(runHtml).join("") : none;
   const visible = showAllRuns ? runs : runs.slice(0, RUNS_SHOWN);
@@ -2138,11 +2072,6 @@ function connectEvents() {
 }
 
 /* ---------- actions ---------- */
-document.querySelectorAll("[data-lang]").forEach((b) => b.addEventListener("click", () => {
-  lang = b.dataset.lang;
-  try { localStorage.setItem("ferry.lang", lang); } catch {}
-  applyLanguage();
-}));
 $("#sync-all").addEventListener("click", async () => { try { toast((await post("/api/sync", { mode: "all" })).message); } catch (err) { toast(err.message, true); } });
 $("#cancel-all").addEventListener("click", () => post("/api/sync/cancel", {}).catch((err) => toast(err.message, true)));
 document.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => {
@@ -2161,7 +2090,7 @@ document.addEventListener("click", async (e) => {
   if (!el) return;
   const d = el.dataset;
   if (d.close) { $(`#${d.close}`).hidden = true; return; }
-  if (d.host) { $("#d-host").value = d.host; $("#d-hosts").hidden = true; $("#d-cred-smb").focus(); return; }
+  if (d.host) { pickHost(el); return; }
   if (d.share) { $("#d-share").value = d.share; $("#d-shares").hidden = true; return; }
   if ("scan" in d) { scanBle(); return; }
   if (d.pickFolder) { pickFolder(d.pickFolder, !!d.append); return; }

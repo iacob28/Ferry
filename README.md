@@ -20,7 +20,7 @@ Windows, Samba; hosts and shares can be discovered from the UI), SFTP (password 
 FTP / FTPES / FTPS, local folders, S3-compatible object storage (Amazon S3, Cloudflare R2,
 Backblaze B2, MinIO, Wasabi) and Google Drive.
 
-The web UI (English and Romanian, admin password) opens on an **Overview**: live progress per
+The web UI (English, admin password) opens on an **Overview**: live progress per
 device, totals, the newest files, device status and recent runs. Each area has its own page,
 reachable from the sidebar (a bottom tab bar on phones): **Library** (everything synced, filtered
 by type and provider), **Devices**, **Destinations** and credentials, **Sync rules**, **Activity**

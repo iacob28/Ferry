@@ -83,8 +83,9 @@ def test_instance_name():
 
 
 async def test_discover_hosts_merges_and_names(monkeypatch):
-    async def fake_mdns(found, timeout):
-        found["192.168.0.2"] = ("SynologyStorage", {"smb"})
+    async def fake_mdns(found, timeout, ports):
+        found["192.168.0.2"] = ("SynologyStorage", {"smb", "sftp"})
+        ports["192.168.0.2"] = {"sftp": 2123}
 
     async def fake_sweep(found):
         found["192.168.0.2"] = {"smb", "afp"}
@@ -100,9 +101,10 @@ async def test_discover_hosts_merges_and_names(monkeypatch):
     hosts = await discovery.discover_hosts(timeout=0.1)
     assert [(h.address, h.name, h.services) for h in hosts] == [
         ("192.168.0.3", "pi.lan", ["nfs"]),
-        ("192.168.0.2", "SynologyStorage", ["afp", "smb"]),
+        ("192.168.0.2", "SynologyStorage", ["afp", "sftp", "smb"]),
         ("192.168.0.4", None, ["smb"]),
     ]
+    assert hosts[1].ports == {"sftp": 2123} and hosts[0].ports == {}
 
 
 SMB_OK = """Reconnecting with SMB1 for workgroup listing.

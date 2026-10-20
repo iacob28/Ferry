@@ -8,7 +8,7 @@ import time
 from collections import deque
 from pathlib import Path
 
-from ..destinations import make_destination
+from ..destinations import resolve_destination
 from ..providers import PROVIDERS, Provider
 from .engine import Progress, SyncEngine
 from .session import Flow, Session
@@ -114,7 +114,7 @@ class SyncService:
             "state": self.state,
             "sessions": [s.snapshot() for s in self.sessions.values()],
             "pairing": self.pairing,
-            "providers": [{"kind": p.kind, "label": p.label} for p in self.providers.values()],
+            "providers": [p.describe() for p in self.providers.values()],
             "radios": {"configured": self.settings.wifi_interfaces, "in_use": sorted(self.radios_in_use)},
             "totals": self.store.totals(),
         }
@@ -150,7 +150,7 @@ class SyncService:
         self.publish_status()
 
     async def _run_session(self, session: Session, flow: Flow) -> None:
-        run_id = self.store.start_run(session.mode)
+        run_id = self.store.start_run(session.mode, provider=session.provider or None)
         ok = False
         try:
             camera, result = await flow(session)
@@ -175,11 +175,14 @@ class SyncService:
             self.publish_status()
 
     def engine(self, settings: Settings, session: Session) -> SyncEngine:
+        """An engine for this session, with the sync rules of its provider and device (session.device)."""
         def on_progress(progress: Progress) -> None:
             session.progress = progress
             self.events.publish({"type": "progress", "session": session.id, "progress": progress.snapshot()})
 
-        return SyncEngine(self.store, settings, make_destination(settings), self.staging,
+        policy = settings.effective(session.provider, session.device)
+        destination = resolve_destination(settings, policy.destination, policy.credentials)
+        return SyncEngine(self.store, policy, destination, self.staging,
                           lambda level, msg: self.log(level, f"{session.camera or session.name}: {msg}"), on_progress,
                           self.thumbs)
 

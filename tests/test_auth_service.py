@@ -105,9 +105,8 @@ def test_library_lists_and_streams_ranges(service, tmp_path):
     media_root = tmp_path / "nas"
     (media_root / "2026/2026-10-20").mkdir(parents=True)
     (media_root / "2026/2026-10-20/GX010001.MP4").write_bytes(bytes(range(256)) * 4)
-    settings = service.settings
-    settings.target, settings.local_path = "local", str(media_root)
-    service.settings_store.save(settings)
+    service.settings_store.save(Settings(destinations=[{"id": "nas", "type": "local", "path": str(media_root)}],
+                                         defaults={"destination": "nas"}))
     service.store.mark_synced("cam1", "100GOPRO/GX010001.MP4", 1760900000, 1024, "2026/2026-10-20/GX010001.MP4")
 
     auth = AuthStore(tmp_path / "auth.json")

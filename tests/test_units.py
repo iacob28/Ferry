@@ -1,6 +1,6 @@
-from ferry.core.engine import dest_rel
+from ferry.core.engine import DeviceInfo, dest_rel
 from ferry.core.media import MediaItem
-from ferry.core.settings import PairedCamera, Settings
+from ferry.core.settings import Credential, Device, Settings
 from ferry.providers.gopro.ble import PacketAssembler, frame, parse_powered_on
 from ferry.providers.gopro.camera import parse_media_list
 from ferry.web import MASK, _merge, _public
@@ -43,25 +43,33 @@ def test_parse_media_list_with_group():
     assert all(f.size is None for f in files[1:])
 
 
+def _policy(**defaults):
+    return Settings(defaults=defaults).effective("gopro")
+
+
 def test_dest_rel_uses_camera_wall_clock():
     m = MediaItem("100GOPRO/GX010474.MP4", "GX010474.MP4", 1758902400, 1)  # 2025-09-26 16:00 camera time
-    assert dest_rel(Settings(), "HERO9 Black", m) == "2025/2025-09-26/GX010474.MP4"
-    custom = Settings(folder_template="{camera}/{year}-{month}")
-    assert dest_rel(custom, "HERO9 Black", m) == "HERO9 Black/2025-09/GX010474.MP4"
-    assert dest_rel(Settings(folder_template=""), "x", m) == "GX010474.MP4"
+    hero = DeviceInfo("gopro", "GoPro", "C344", "HERO9 Black", "Helmet cam")
+    assert dest_rel(_policy(path=""), hero, m) == "2025/2025-09-26/GX010474.MP4"
+    assert dest_rel(_policy(), hero, m) == "GoPro/2025/2025-09-26/GX010474.MP4"
+    custom = _policy(path="Media/{provider}", folder_template="{camera}/{year}-{month}/{device}")
+    assert dest_rel(custom, hero, m) == "Media/GoPro/HERO9 Black/2025-09/Helmet cam/GX010474.MP4"
+    assert dest_rel(_policy(path="", folder_template=""), hero, m) == "GX010474.MP4"
+    slashy = DeviceInfo("gopro", "GoPro", "C344", "HERO9", "a/../b")
+    assert dest_rel(_policy(path="{device}", folder_template=""), slashy, m) == "a-..-b/GX010474.MP4"
 
 
-def test_settings_password_masking_and_merge():
-    current = Settings(cameras=[PairedCamera(address="AA:BB")])
-    current.smb.password = "secret"
+def test_settings_secret_masking_and_merge():
+    current = Settings(credentials=[Credential(id="nas", username="u", password="secret")],
+                       devices=[Device(id="gopro:AA", provider="gopro", config={"address": "AA"})])
     public = _public(current)
-    assert public["smb"]["password"] == MASK
-    public["smb"]["host"] = "nas"
-    public["cameras"] = []
+    assert public["credentials"][0]["password"] == MASK
+    public["credentials"][0]["username"] = "other"
+    public["devices"] = []
     merged = _merge(current, public)
-    assert merged.smb.password == "secret"
-    assert merged.smb.host == "nas"
-    assert [c.address for c in merged.cameras] == ["AA:BB"]
+    assert merged.credentials[0].password == "secret"
+    assert merged.credentials[0].username == "other"
+    assert [d.id for d in merged.devices] == ["gopro:AA"]
 
 
 async def test_camera_requests_with_a_path_query_parameter():

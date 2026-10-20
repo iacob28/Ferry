@@ -27,6 +27,8 @@ class RemoteObject:
 
 class Destination(ABC):
     kind: str
+    # Credential kinds this destination can log in with (empty: it needs none).
+    credential_kinds: frozenset[str] = frozenset()
 
     @abstractmethod
     def describe(self, key: str = "") -> str: ...

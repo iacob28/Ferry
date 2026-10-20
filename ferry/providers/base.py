@@ -9,19 +9,46 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
+from pydantic import BaseModel
+
+from ..core.settings import Device, Settings
+
 if TYPE_CHECKING:
     from ..core.service import SyncService
     from ..core.session import Session
 
 
+class NoOptions(BaseModel):
+    pass
+
+
 class Provider(ABC):
     kind: str
     label: str
+    # Phosphor icon name for the UI.
+    icon: str = "ph-device-mobile"
+    # Validates settings.providers[kind].options.
+    options_model: type[BaseModel] = NoOptions
 
     def __init__(self, service: SyncService):
         self.service = service
         # Address of the device being paired, if any (the UI shows a pairing state).
         self.pairing: str | None = None
+
+    def options(self, settings: Settings) -> BaseModel:
+        return self.options_model.model_validate(settings.provider(self.kind).options)
+
+    def auto_sync(self, settings: Settings) -> bool:
+        """Whether this provider may start syncs on its own (manual syncs always work)."""
+        return settings.provider(self.kind).enabled
+
+    def describe(self) -> dict:
+        return {"kind": self.kind, "label": self.label, "icon": self.icon,
+                "options": self.options_model().model_dump()}
+
+    async def new_device(self, name: str, config: dict) -> Device:
+        """Validates a device the user adds by hand (a printer by IP, ...)."""
+        raise ValueError(f"{self.label} devices are added automatically")
 
     @abstractmethod
     async def watch(self) -> None:

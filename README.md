@@ -81,10 +81,27 @@ synced again for the configured pause.
 Off by default. When enabled, files are deleted from the camera only after every file of
 the run exists on the destination with the exact same size.
 
+## Destinations and sync rules
+
+Destinations (SMB shares, local folders) and credentials are set up once and referenced by
+the sync rules. The rules are layered, and each layer only overrides what it sets:
+
+1. **Global rules**: destination, folder in the destination, folder layout, delete after sync.
+2. **Provider settings** (GoPro, ...): overrides for every device of that kind, plus the
+   provider's own options (automatic USB / wireless sync, standby, wireless pause).
+3. **Device settings**: overrides for one camera, for example a different folder or a different
+   login on the same server.
+
+Every field in the provider and device editors shows the value it inherits until you switch on
+*Override*, and a preview shows exactly where a file would land.
+
 ## How files are organised
 
-The folder layout is a template, `{year}/{date}` by default, which gives
-`2026/2026-09-26/GX010474.MP4`. Available fields: `{year} {month} {day} {date} {camera}`.
+A file lands at `<folder in the destination>/<folder layout>/<file name>`. The folder in the
+destination defaults to `{provider}` and the layout to `{year}/{date}`, which gives
+`GoPro/2026/2026-09-26/GX010474.MP4`. Available fields in both:
+`{year} {month} {day} {date} {provider} {device} {model}` (`{camera}` is an alias of `{model}`).
+Settings migrated from GoPro Sync keep an empty folder, so existing files stay where they are.
 Dates come from the camera's clock. If a different file with the same name already exists
 (cameras reuse numbers after a card format), the new one is saved as `GX010474_<timestamp>.MP4`.
 Files already present with the same size are not uploaded twice, so several servers can

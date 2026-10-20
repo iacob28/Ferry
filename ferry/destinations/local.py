@@ -6,16 +6,17 @@ import os
 from pathlib import Path
 from typing import BinaryIO, Callable
 
+from ..core.settings import Credential, DestinationConfig
 from .base import Destination, DestinationError, RemoteObject, copy_stream
 
 
 class LocalDestination(Destination):
     kind = "local"
 
-    def __init__(self, root: str):
-        if not root:
-            raise DestinationError("local target path is not configured")
-        self.root = Path(root)
+    def __init__(self, cfg: DestinationConfig, credential: Credential | None = None):
+        if not cfg.path:
+            raise DestinationError("local folder path is not configured")
+        self.root = Path(cfg.path)
 
     def describe(self, key: str = "") -> str:
         return str(self.root / key) if key else str(self.root)

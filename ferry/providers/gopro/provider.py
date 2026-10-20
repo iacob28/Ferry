@@ -6,8 +6,11 @@ import asyncio
 import sys
 import time
 
+from pydantic import BaseModel
+
+from ...core.engine import DeviceInfo
 from ...core.session import Flow, Session
-from ...core.settings import PairedCamera, Settings
+from ...core.settings import Device, Settings
 from ..base import Provider
 from . import ble, usb
 from .camera import WIFI_AP_HOST, GoProHttp
@@ -20,9 +23,23 @@ BLE_FAILURE_COOLDOWN = 5 * 60
 LOW_BATTERY = 15
 
 
+class GoProOptions(BaseModel):
+    usb: bool = True  # sync automatically when a camera is plugged in
+    ble: bool = True  # sync automatically when a paired camera is switched on nearby
+    sleep_after_sync: bool = True
+    # Minimum time between two wireless offloads of the same camera.
+    cooldown_minutes: int = 30
+
+
+def paired_cameras(settings: Settings) -> list[Device]:
+    return [d for d in settings.devices_of("gopro") if d.config.get("address")]
+
+
 class GoProProvider(Provider):
     kind = "gopro"
     label = "GoPro"
+    icon = "ph-video-camera"
+    options_model = GoProOptions
 
     def __init__(self, service):
         super().__init__(service)
@@ -63,10 +80,11 @@ class GoProProvider(Provider):
                     self._usb_manual.add(cam.camera_ip)
                     requested += 1
         if mode in ("ble", "wifi", "all") and self.ble_available:
-            for paired in self.service.settings.cameras:
-                key = f"ble:{paired.address}"
-                if (device is None or device in (key, paired.address)) and key not in sessions:
-                    self._ble_force.add(paired.address)
+            for paired in paired_cameras(self.service.settings):
+                address = paired.config["address"]
+                key = f"ble:{address}"
+                if (device is None or device in (key, address, paired.id)) and key not in sessions:
+                    self._ble_force.add(address)
                     requested += 1
         return requested
 
@@ -75,7 +93,7 @@ class GoProProvider(Provider):
             raise RuntimeError("Bluetooth is only supported on Linux hosts")
         async with self.service.bluetooth_lock:
             adverts = await ble.scan(timeout=BLE_SCAN_SECONDS)
-        paired = {c.address for c in self.service.settings.cameras}
+        paired = {c.config["address"] for c in paired_cameras(self.service.settings)}
         return [{**a.__dict__, "paired": a.address in paired} for a in adverts]
 
     async def pair(self, address: str, name: str) -> None:
@@ -93,19 +111,27 @@ class GoProProvider(Provider):
             await camera.disconnect()
             self.pairing = None
             self.service.publish_status()
-        settings = self.service.settings
-        settings.cameras = [c for c in settings.cameras if c.address != address]
-        settings.cameras.append(PairedCamera(address=address, name=name))
-        self.service.settings_store.save(settings)
+        def add(settings: Settings) -> None:
+            existing = next((d for d in paired_cameras(settings) if d.config["address"] == address), None)
+            if existing is None:
+                settings.devices.append(Device(id=f"gopro:{address}", provider=self.kind, name=name,
+                                               config={"address": address}))
+            elif name:
+                existing.name = name
+
+        self.service.settings_store.update(add)
 
     def forget(self, address: str) -> None:
-        settings = self.service.settings
-        settings.cameras = [c for c in settings.cameras if c.address != address]
-        self.service.settings_store.save(settings)
+        def remove(settings: Settings) -> None:
+            settings.devices = [d for d in settings.devices
+                                if not (d.provider == self.kind and d.config.get("address") == address)]
+
+        self.service.settings_store.update(remove)
 
     def session_finished(self, session: Session, ok: bool) -> None:
         if session.mode == "wifi":
-            cooldown = self.service.settings.ble_cooldown_minutes * 60 if ok else BLE_FAILURE_COOLDOWN
+            opts = self.options(self.service.settings)
+            cooldown = opts.cooldown_minutes * 60 if ok else BLE_FAILURE_COOLDOWN
             self._ble_next_allowed[session.source] = time.time() + cooldown
 
     # --- watchers --------------------------------------------------------
@@ -115,6 +141,7 @@ class GoProProvider(Provider):
         while True:
             try:
                 settings = service.settings
+                auto = self.auto_sync(settings) and self.options(settings).usb
                 cameras = await usb.discover(service.run_dir)
                 changed = {c.camera_ip for c in cameras} != {c.camera_ip for c in self.usb_cameras}
                 self.usb_cameras = cameras
@@ -126,7 +153,7 @@ class GoProProvider(Provider):
                     key = f"usb:{cam.camera_ip}"
                     if cam.camera_ip in self._usb_handled or key in service.sessions:
                         continue
-                    if not (settings.usb_enabled or cam.camera_ip in self._usb_manual):
+                    if not (auto or cam.camera_ip in self._usb_manual):
                         continue
                     if not service.has_capacity(settings):
                         break
@@ -150,8 +177,9 @@ class GoProProvider(Provider):
             return
         while True:
             settings = service.settings
-            wanted = settings.ble_enabled or self._ble_force
-            if not (wanted and settings.cameras) or self.pairing:
+            auto = self.auto_sync(settings) and self.options(settings).ble
+            cameras = paired_cameras(settings)
+            if not ((auto or self._ble_force) and cameras) or self.pairing:
                 await asyncio.sleep(5)
                 continue
             try:
@@ -163,7 +191,7 @@ class GoProProvider(Provider):
                 service.log("error", f"Bluetooth scan failed: {exc}")
                 await asyncio.sleep(30)
                 continue
-            paired = {c.address: c for c in settings.cameras}
+            paired = {c.config["address"]: c for c in cameras}
             now = time.time()
             for adv in adverts:
                 cam = paired.get(adv.address)
@@ -172,7 +200,7 @@ class GoProProvider(Provider):
                 self.ble_seen[adv.address] = {"ts": now, "rssi": adv.rssi, "powered_on": adv.powered_on}
                 key = f"ble:{adv.address}"
                 forced = adv.address in self._ble_force
-                if key in service.sessions or not (settings.ble_enabled or forced):
+                if key in service.sessions or not ((auto and cam.enabled) or forced):
                     continue
                 # Only react to a camera the user switched on; a sleeping camera keeps advertising.
                 if adv.powered_on is False and not forced:
@@ -185,28 +213,47 @@ class GoProProvider(Provider):
                 self._ble_force.discard(adv.address)
                 service.radios_in_use.add(radio)
                 service.start_session(Session(key, "wifi", adv.address, cam.name or adv.name or "GoPro",
-                                              radio=radio, provider=self.kind),
+                                              radio=radio, provider=self.kind, device=cam.id),
                                       self._offload_wifi(cam, radio))
             service.publish_status()
             await asyncio.sleep(2)
 
     # --- offload flows ---------------------------------------------------
 
-    def _identify(self, session: Session, info: dict, fallback: str) -> tuple[str, str]:
-        return self.service.identify(session, info.get("serial_number") or fallback, info.get("model_name") or "GoPro")
+    def _identify(self, session: Session, info: dict, fallback: str) -> DeviceInfo:
+        """Matches the connected camera to its device entry (registering USB-only cameras)."""
+        serial = info.get("serial_number") or fallback
+        model = info.get("model_name") or "GoPro"
+        found: list[Device] = []
+
+        def register(settings: Settings) -> None:
+            devices = settings.devices_of(self.kind)
+            device = (settings.device(session.device)
+                      or next((d for d in devices if d.config.get("serial") == serial), None))
+            if device is None:
+                device = Device(id=f"gopro:{serial}", provider=self.kind, name=model)
+                settings.devices.append(device)
+            device.config["serial"] = serial
+            device.config.setdefault("model", model)
+            found.append(device)
+
+        self.service.settings_store.update(register)
+        device = found[0]
+        session.device = device.id
+        self.service.identify(session, serial, model)
+        return DeviceInfo(self.kind, self.label, serial, model, device.name)
 
     def _offload_usb(self, cam: usb.UsbCamera) -> Flow:
         async def flow(session: Session):
             service = self.service
-            settings = service.settings
             service.log("info", f"camera detected on USB ({cam.interface}, {cam.camera_ip})")
             http = GoProHttp(cam.camera_ip)
             try:
                 await http.wait_ready()
                 await http.set_wired_control(True)
-                camera_id, label = self._identify(session, await http.info(), cam.camera_ip)
+                device = self._identify(session, await http.info(), cam.camera_ip)
                 session.battery = await http.battery_percent()
-                result = await service.engine(settings, session).run(http, camera_id, label, keep_alive=http.keep_alive)
+                result = await service.engine(service.settings, session).run(http, device, keep_alive=http.keep_alive)
                 return session.camera, result
             finally:
                 try:
@@ -217,15 +264,17 @@ class GoProProvider(Provider):
 
         return flow
 
-    def _offload_wifi(self, paired: PairedCamera, radio: str) -> Flow:
+    def _offload_wifi(self, paired: Device, radio: str) -> Flow:
+        address = paired.config["address"]
+
         async def flow(session: Session):
             service = self.service
-            settings: Settings = service.settings
+            opts = self.options(service.settings)
             wifi = WifiLink(radio, service.run_dir)
             # Check the radio before waking anything up.
             await wifi.ensure_safe()
             service.log("info", f"{session.name} is on; connecting over Bluetooth")
-            camera = ble.GoProBle(paired.address)
+            camera = ble.GoProBle(address)
             async with service.bluetooth_lock:
                 await camera.connect()
             http: GoProHttp | None = None
@@ -236,11 +285,11 @@ class GoProProvider(Provider):
                 await wifi.connect(ssid, password)
                 http = GoProHttp(WIFI_AP_HOST, interface=radio)
                 await http.wait_ready()
-                camera_id, label = self._identify(session, await http.info(), paired.address)
+                device = self._identify(session, await http.info(), address)
                 session.battery = await http.battery_percent()
                 if session.battery is not None and session.battery < LOW_BATTERY:
                     service.log("warning", f"{session.camera}: battery at {session.battery}%; the offload may stop early")
-                result = await service.engine(settings, session).run(http, camera_id, label, keep_alive=camera.keep_alive)
+                result = await service.engine(service.settings, session).run(http, device, keep_alive=camera.keep_alive)
                 return session.camera, result
             finally:
                 if http is not None:
@@ -248,7 +297,7 @@ class GoProProvider(Provider):
                 # Safe even if joining failed half-way: only touches our own supplicant and 10.5.5.x.
                 await wifi.disconnect()
                 try:
-                    if settings.sleep_after_sync:
+                    if opts.sleep_after_sync:
                         await camera.sleep()
                     else:
                         await camera.set_wifi_ap(False)

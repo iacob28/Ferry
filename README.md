@@ -24,7 +24,7 @@ The web UI (English and Romanian, admin password) opens on an **Overview**: live
 device, totals, the newest files, device status and recent runs. Each area has its own page,
 reachable from the sidebar (a bottom tab bar on phones): **Library** (everything synced, filtered
 by type and provider), **Devices**, **Destinations** and credentials, **Sync rules**, **Activity**
-(history and logs) and **Settings**. Pages have their own links (`#/library`, `#/devices`, ...).
+(history and logs) and **Settings**. A button in the top bar switches between the system theme, light and dark. Pages have their own links (`#/library`, `#/devices`, ...).
 Ferry was called GoPro Sync until 0.2.0.
 
 ## Requirements

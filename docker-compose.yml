@@ -31,3 +31,5 @@ services:
       - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
       # Device nodes for USB drives plugged in after start.
       - /dev:/dev
+      # A host folder for "Local folder" destinations; it then shows up in the folder picker.
+      # - /srv/media:/media

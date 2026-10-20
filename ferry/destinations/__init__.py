@@ -4,13 +4,17 @@ from __future__ import annotations
 
 from ..core.settings import Credential, DestinationConfig, Settings
 from .base import Destination, DestinationError, RemoteObject
+from .gdrive import GoogleDriveDestination
 from .local import LocalDestination
+from .s3 import S3Destination
 from .smb import SmbDestination
 
-__all__ = ["DESTINATION_TYPES", "Destination", "DestinationError", "LocalDestination", "RemoteObject",
-           "SmbDestination", "build_destination", "resolve_destination"]
+__all__ = ["DESTINATION_TYPES", "Destination", "DestinationError", "GoogleDriveDestination", "LocalDestination",
+           "RemoteObject", "S3Destination", "SmbDestination", "build_destination", "resolve_destination"]
 
-DESTINATION_TYPES: dict[str, type[Destination]] = {"smb": SmbDestination, "local": LocalDestination}
+DESTINATION_TYPES: dict[str, type[Destination]] = {
+    "smb": SmbDestination, "local": LocalDestination, "s3": S3Destination, "gdrive": GoogleDriveDestination,
+}
 
 
 def build_destination(cfg: DestinationConfig, credential: Credential | None) -> Destination:

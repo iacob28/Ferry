@@ -500,6 +500,8 @@
             <label class="toggle risky"><span class="txt"><div class="t" data-i18n="deleteAfter"></div><div class="d" data-i18n="deleteAfterD"></div></span>
               <span class="switch"><input type="checkbox" id="g-delete_after_sync" name="delete_after_sync"><span></span></span></label>
           </div>
+          <div class="field full" style="margin-top: 6px"><label data-i18n="alsoCopyTo">Also copy to</label><div id="g-mirrors"></div>
+            <div class="help" data-i18n="alsoCopyToD"></div></div>
           <div class="preview" id="g-preview"></div>
           <div class="inline-fields" style="grid-template-columns: repeat(2, minmax(0, 1fr))">
             <div class="field"><label for="g-radios" data-i18n="wifiIfaces">Wi-Fi radios</label><input type="text" id="g-radios" class="mono" placeholder="wlan0, wlan1">
@@ -635,6 +637,20 @@ const I18N = {
     opt_bambu_delay_after_print_seconds: "Wait after a print (seconds)", opt_bambu_delay_after_print_seconds_d: "The printer needs a moment to finish writing the timelapse.",
     opt_bambu_folders: "Folders", opt_bambu_folders_d: "Folders on the SD card to copy from.",
     opt_bambu_extensions: "File types", opt_bambu_extensions_d: "Extensions to copy (P1 series: mp4 or avi, depending on firmware).",
+    objectStorage: "S3 / R2", googleDrive: "Google Drive", endpoint: "Endpoint",
+    endpointHelp: "Cloudflare R2: https://<account id>.r2.cloudflarestorage.com. Leave empty for Amazon S3; MinIO, Backblaze B2 and Wasabi work too.",
+    bucket: "Bucket", region: "Region", prefix: "Folder (prefix) in the bucket", accessKey: "Access key", keyId: "Access key ID", secretKey: "Secret access key",
+    accessKeyHelp: "For R2: R2, Manage API tokens, Object Read & Write for the bucket.",
+    googleAccount: "Google account", googleAccountHelp: "Add a Google account under Credentials first (needs your own OAuth client).",
+    driveFolder: "Folder in My Drive", driveFolderHelp: "Ferry creates it; it can only see the folders and files it made itself.",
+    credPick: "Choose…", credPassword: "Username and password", credAccessKey: "Access key", credGoogle: "Google account",
+    oauthClientId: "OAuth client ID", oauthClientSecret: "OAuth client secret",
+    oauthHelp: "In Google Cloud Console: enable the Google Drive API, then Credentials, Create OAuth client ID, type \"TVs and Limited Input devices\". Paste its ID and secret here, save, then connect.",
+    googleConnect: "Connect Google account", googleReconnect: "Connect again", googleConnected: "Connected as {account}", googleConnectedShort: "Connected",
+    googleNotConnected: "Not connected yet", googleCodeStep: "Open this page on any device, sign in and enter the code:",
+    googleWaiting: "Waiting for you to approve…",
+    alsoCopyTo: "Also copy to", alsoCopyToD: "Every file also goes to these destinations (an off-site backup, for example). A file counts as synced, and can be deleted from the device, only once all of them have it.",
+    none: "none",
   },
   ro: {
     destination: "Destinație", files: "Fișiere", speed: "Viteză", remaining: "Timp rămas", battery: "Baterie",
@@ -719,6 +735,20 @@ const I18N = {
     opt_bambu_delay_after_print_seconds: "Așteaptă după print (secunde)", opt_bambu_delay_after_print_seconds_d: "Imprimanta are nevoie de puțin timp să termine de scris timelapse-ul.",
     opt_bambu_folders: "Foldere", opt_bambu_folders_d: "Folderele de pe cardul SD din care se copiază.",
     opt_bambu_extensions: "Tipuri de fișiere", opt_bambu_extensions_d: "Extensiile copiate (seria P1: mp4 sau avi, în funcție de firmware).",
+    objectStorage: "S3 / R2", googleDrive: "Google Drive", endpoint: "Endpoint",
+    endpointHelp: "Cloudflare R2: https://<account id>.r2.cloudflarestorage.com. Gol pentru Amazon S3; merg și MinIO, Backblaze B2 și Wasabi.",
+    bucket: "Bucket", region: "Regiune", prefix: "Folder (prefix) în bucket", accessKey: "Cheie de acces", keyId: "ID cheie de acces", secretKey: "Cheie secretă",
+    accessKeyHelp: "Pentru R2: R2, Manage API tokens, Object Read & Write pe bucket.",
+    googleAccount: "Cont Google", googleAccountHelp: "Adaugă întâi un cont Google la Credențiale (îți trebuie propriul client OAuth).",
+    driveFolder: "Folder în My Drive", driveFolderHelp: "Ferry îl creează; vede doar folderele și fișierele create de el.",
+    credPick: "Alege…", credPassword: "Utilizator și parolă", credAccessKey: "Cheie de acces", credGoogle: "Cont Google",
+    oauthClientId: "ID client OAuth", oauthClientSecret: "Secret client OAuth",
+    oauthHelp: "În Google Cloud Console: activează Google Drive API, apoi Credentials, Create OAuth client ID, tip \"TVs and Limited Input devices\". Lipește aici ID-ul și secretul, salvează, apoi conectează.",
+    googleConnect: "Conectează contul Google", googleReconnect: "Conectează din nou", googleConnected: "Conectat ca {account}", googleConnectedShort: "Conectat",
+    googleNotConnected: "Neconectat încă", googleCodeStep: "Deschide pagina pe orice dispozitiv, autentifică-te și introdu codul:",
+    googleWaiting: "Se așteaptă aprobarea…",
+    alsoCopyTo: "Copiază și în", alsoCopyToD: "Fiecare fișier ajunge și în aceste destinații (de exemplu un backup off-site). Un fișier e considerat sincronizat, și poate fi șters de pe dispozitiv, doar după ce e în toate.",
+    none: "niciuna",
   },
 };
 const LOCALES = { en: "en-GB", ro: "ro-RO" };
@@ -1021,6 +1051,16 @@ function describeDest(dest, key = "") {
     return parts.join("\\");
   }
   if (dest.type === "local") return [dest.path || "?", key].filter(Boolean).join("/");
+  const join = (...parts) => parts.flatMap((p) => (p || "").split("/")).filter(Boolean).join("/");
+  if (dest.type === "s3") {
+    let host = dest.endpoint || `s3.${dest.region || "us-east-1"}.amazonaws.com`;
+    host = host.replace(/^https?:\/\//, "").replace(/\/+$/, "");
+    return `s3://${host}/${join(dest.bucket || "?", dest.base_path, key)}`;
+  }
+  if (dest.type === "gdrive") {
+    const account = credById(dest.credentials)?.account;
+    return `drive://${account ? account + ":" : ""}${join(dest.base_path || "Ferry", key)}`;
+  }
   return `${dest.type}:${dest.name || dest.id}/${key}`;
 }
 const destById = (id) => settings.destinations.find((d) => d.id === id);
@@ -1042,13 +1082,13 @@ function renderSettings() {
   const def = settings.defaults.destination;
   $("#target-hint").textContent = def ? describeDest(destById(def)) : t("notSet");
   $("#dest-list").innerHTML = settings.destinations.length ? settings.destinations.map((d) => `<div class="device clickable" data-edit-dest="${esc(d.id)}">
-      <div class="ico"><i class="ph ${d.type === "local" ? "ph-folder" : "ph-network"}"></i></div>
+      <div class="ico"><i class="ph ${destType(d.type).icon}"></i></div>
       <div class="meta"><div class="name">${esc(d.name || d.id)}${d.id === def ? ` <span class="tag on">${esc(t("defaultTag"))}</span>` : ""}</div>
       <div class="sub mono">${esc(describeDest(d))}</div></div><i class="ph ph-caret-right" style="color: var(--faint)"></i></div>`).join("")
     : `<div class="empty"><i class="ph ph-hard-drives"></i>${esc(t("noDestinations"))}</div>`;
   $("#cred-list").innerHTML = settings.credentials.length ? settings.credentials.map((c) => `<div class="device clickable" data-edit-cred="${esc(c.id)}">
-      <div class="ico"><i class="ph ph-key"></i></div>
-      <div class="meta"><div class="name">${esc(c.name || c.username || c.id)}</div><div class="sub mono">${esc(c.username || c.key_id || c.account || "")}</div></div>
+      <div class="ico"><i class="ph ${c.kind === "oauth_google" ? "ph-google-logo" : c.kind === "access_key" ? "ph-key" : "ph-user"}"></i></div>
+      <div class="meta"><div class="name">${esc(credLabel(c))}</div><div class="sub mono">${esc(c.kind === "oauth_google" ? (c.refresh_token ? c.account || t("googleConnectedShort") : t("googleNotConnected")) : c.username || c.key_id || "")}</div></div>
       <i class="ph ph-caret-right" style="color: var(--faint)"></i></div>`).join("")
     : `<div class="empty"><i class="ph ph-key"></i>${esc(t("noCredentials"))}</div>`;
   const form = $("#rules-form");
@@ -1057,6 +1097,7 @@ function renderSettings() {
       settings.destinations.map((d) => `<option value="${esc(d.id)}">${esc(d.name || d.id)}</option>`).join("");
     for (const k of ["destination", "path", "folder_template"]) $(`#g-${k}`).value = settings.defaults[k] ?? "";
     $("#g-delete_after_sync").checked = !!settings.defaults.delete_after_sync;
+    $("#g-mirrors").innerHTML = mirrorsHtml("data-g-mirror", settings.defaults.mirrors);
     $("#g-radios").value = settings.wifi_interfaces.join(", ");
     $("#g-par").value = settings.max_parallel_syncs;
   }
@@ -1064,7 +1105,8 @@ function renderSettings() {
 }
 function readGlobal() {
   return { destination: $("#g-destination").value, path: $("#g-path").value, folder_template: $("#g-folder_template").value,
-           delete_after_sync: $("#g-delete_after_sync").checked };
+           delete_after_sync: $("#g-delete_after_sync").checked,
+           mirrors: [...document.querySelectorAll("[data-g-mirror]:checked")].map((x) => x.value) };
 }
 function updateGlobalPreview() { setPreview($("#g-preview"), previewHtml(readGlobal(), sampleFields("GoPro", "HERO9", "HERO9 Black"))); }
 $("#rules-form").addEventListener("input", updateGlobalPreview);
@@ -1127,7 +1169,11 @@ const RULES = [
   { key: "path", label: "folderInDest", kind: "text" },
   { key: "folder_template", label: "folderLayout", kind: "text" },
   { key: "delete_after_sync", label: "deleteAfter", kind: "bool" },
+  { key: "mirrors", label: "alsoCopyTo", kind: "multi" },
 ];
+const mirrorsHtml = (attr, value) => `<div class="mirrors">${settings.destinations.length ? settings.destinations.map((d) => `<label class="override" style="margin: 0 14px 6px 0">
+  <span class="switch sm"><input type="checkbox" ${attr} value="${esc(d.id)}" ${(value || []).includes(d.id) ? "checked" : ""}><span></span></span>${esc(d.name || d.id)}</label>`).join("")
+  : `<span class="small muted">${esc(t("noDestinations"))}</span>`}</div>`;
 function ruleOptions(key) {
   return key === "destination"
     ? settings.destinations.map((d) => `<option value="${esc(d.id)}">${esc(d.name || d.id)}</option>`).join("")
@@ -1137,6 +1183,7 @@ function ruleValueText(key, v) {
   if (key === "destination") return destLabel(v);
   if (key === "credentials") return v ? (credById(v)?.name || credById(v)?.username || v) : t("ownCredentials");
   if (key === "delete_after_sync") return t(v ? "yes" : "no");
+  if (key === "mirrors") return v?.length ? v.map(destLabel).join(", ") : t("none");
   return v === "" ? t("empty") : v;
 }
 function rulesHtml(overrides, inherited, origin, providerLabel) {
@@ -1146,6 +1193,7 @@ function rulesHtml(overrides, inherited, origin, providerLabel) {
     const layer = origin[r.key] === "provider" ? t("layer_provider", { p: providerLabel }) : t("layer_global");
     const ctl = r.kind === "select" ? `<select data-rule="${r.key}">${ruleOptions(r.key)}</select>`
       : r.kind === "bool" ? `<label class="override"><span class="switch sm"><input type="checkbox" data-rule="${r.key}" ${value ? "checked" : ""}><span></span></span>${esc(t("yes"))}</label>`
+      : r.kind === "multi" ? mirrorsHtml(`data-rule-item="${r.key}"`, value)
       : `<input type="text" class="mono" data-rule="${r.key}" value="${esc(value ?? "")}">`;
     return `<div class="rule${on ? "" : " inherited"}" data-rule-row="${r.key}"><span class="lbl">${esc(t(r.label))}</span>
       <label class="override">${esc(t("override"))}<span class="switch sm"><input type="checkbox" data-rule-on="${r.key}" ${on ? "checked" : ""}><span></span></span></label>
@@ -1165,6 +1213,7 @@ function readRules(root) {
   const out = {};
   for (const r of RULES) {
     if (!root.querySelector(`[data-rule-on="${r.key}"]`).checked) { out[r.key] = null; continue; }
+    if (r.kind === "multi") { out[r.key] = [...root.querySelectorAll(`[data-rule-item="${r.key}"]:checked`)].map((x) => x.value); continue; }
     const el = root.querySelector(`[data-rule="${r.key}"]`);
     out[r.key] = r.kind === "bool" ? el.checked : r.key === "credentials" ? (el.value || null) : el.value;
   }
@@ -1260,24 +1309,30 @@ function openDeviceEditor(id) {
   });
 }
 
-// Destination types the editor offers; cloud ones join this list.
+// Destination types the editor offers, and the credential kind each one logs in with.
 const DEST_TYPES = [
-  { type: "smb", icon: "ph-network", label: "networkShare" },
-  { type: "local", icon: "ph-folder", label: "localFolder" },
+  { type: "smb", icon: "ph-network", label: "networkShare", cred: "password" },
+  { type: "local", icon: "ph-folder", label: "localFolder", cred: null },
+  { type: "s3", icon: "ph-cloud", label: "objectStorage", cred: "access_key" },
+  { type: "gdrive", icon: "ph-google-drive-logo", label: "googleDrive", cred: "oauth_google" },
 ];
-function credSelect(id, value, allowNew) {
-  return `<select id="${id}"><option value="">${esc(t("credNone"))}</option>` +
-    settings.credentials.filter((c) => c.kind === "password").map((c) => `<option value="${esc(c.id)}" ${c.id === value ? "selected" : ""}>${esc(c.name || c.username || c.id)}</option>`).join("") +
+const destType = (type) => DEST_TYPES.find((x) => x.type === type) || DEST_TYPES[0];
+const credLabel = (c) => c.name || c.username || c.account || c.key_id || c.id;
+function credSelect(id, kind, value, allowNew) {
+  return `<select id="${id}" data-cred-kind="${kind}"><option value="">${esc(t(kind === "password" ? "credNone" : "credPick"))}</option>` +
+    settings.credentials.filter((c) => c.kind === kind).map((c) => `<option value="${esc(c.id)}" ${c.id === value ? "selected" : ""}>${esc(credLabel(c))}</option>`).join("") +
     (allowNew ? `<option value="__new">${esc(t("credNew"))}</option>` : "") + `</select>`;
 }
 function openDestEditor(id) {
   const existing = id ? destById(id) : null;
-  const d = existing ? structuredClone(existing) : { id: "", name: "", type: "smb", host: "", share: "", base_path: "", path: "", credentials: null };
+  const d = existing ? structuredClone(existing)
+    : { id: "", name: "", type: "smb", host: "", share: "", base_path: "", path: "", endpoint: "", region: "", bucket: "", credentials: null };
   const typeSeg = DEST_TYPES.map((x) => `<input type="radio" name="dest-type" value="${x.type}" id="dt-${x.type}" ${x.type === d.type ? "checked" : ""}>
     <label for="dt-${x.type}"><i class="ph ${x.icon}"></i><span>${esc(t(x.label))}</span></label>`).join("");
+  const cred = (kind) => (d.type === destType(d.type).type && destType(d.type).cred === kind ? d.credentials : null);
   openEditor({
     icon: "ph-hard-drives", title: existing ? existing.name || existing.id : t("newDestination"),
-    body: `<div class="seg" style="margin-bottom: 16px">${typeSeg}</div>
+    body: `<div class="seg" style="margin-bottom: 16px; flex-wrap: wrap; display: inline-flex">${typeSeg}</div>
       <div class="fields">
         <div class="field full"><label for="d-name">${esc(t("name"))}</label><input type="text" id="d-name" value="${esc(d.name)}" placeholder="Synology"></div>
       </div>
@@ -1286,18 +1341,34 @@ function openDestEditor(id) {
           <div class="with-btn"><input type="text" id="d-host" value="${esc(d.host)}" placeholder="nas.local">
             <button type="button" class="btn" data-discover><i class="ph ph-binoculars"></i>${esc(t("discover"))}</button></div>
           <div class="picker" id="d-hosts" hidden></div></div>
-        <div class="field full"><label for="d-cred">${esc(t("credentials"))}</label>${credSelect("d-cred", d.credentials, true)}</div>
-        <div class="field" data-new-cred hidden><label for="d-user">${esc(t("username"))}</label><input type="text" id="d-user"></div>
-        <div class="field" data-new-cred hidden><label for="d-pass">${esc(t("password"))}</label><input type="password" id="d-pass" autocomplete="new-password"></div>
+        <div class="field full"><label for="d-cred-smb">${esc(t("credentials"))}</label>${credSelect("d-cred-smb", "password", cred("password"), true)}</div>
+        <div class="field" data-new-cred="smb" hidden><label for="d-user">${esc(t("username"))}</label><input type="text" id="d-user"></div>
+        <div class="field" data-new-cred="smb" hidden><label for="d-pass">${esc(t("password"))}</label><input type="password" id="d-pass" autocomplete="new-password"></div>
         <div class="field full"><label for="d-share">${esc(t("share"))}</label>
           <div class="with-btn"><input type="text" id="d-share" value="${esc(d.share)}">
             <button type="button" class="btn" data-browse><i class="ph ph-folders"></i>${esc(t("browse"))}</button></div>
           <div class="picker" id="d-shares" hidden></div></div>
-        <div class="field full"><label for="d-base">${esc(t("subfolder"))}</label><input type="text" id="d-base" value="${esc(d.base_path)}" placeholder="${esc(t("optional"))}"></div>
+        <div class="field full"><label for="d-base">${esc(t("subfolder"))}</label><input type="text" id="d-base" value="${esc(d.type === "smb" ? d.base_path : "")}" placeholder="${esc(t("optional"))}"></div>
       </div>
       <div class="fields" data-dest-for="local" style="margin-top: 16px">
         <div class="field full"><label for="d-path">${esc(t("path"))}</label><input type="text" id="d-path" value="${esc(d.path)}" placeholder="/data/library">
           <div class="help">${esc(t("localHelp"))}</div></div>
+      </div>
+      <div class="fields" data-dest-for="s3" style="margin-top: 16px">
+        <div class="field full"><label for="d-endpoint">${esc(t("endpoint"))}</label><input type="text" id="d-endpoint" class="mono" value="${esc(d.endpoint)}" placeholder="https://<account>.r2.cloudflarestorage.com">
+          <div class="help">${esc(t("endpointHelp"))}</div></div>
+        <div class="field"><label for="d-bucket">${esc(t("bucket"))}</label><input type="text" id="d-bucket" class="mono" value="${esc(d.bucket)}"></div>
+        <div class="field"><label for="d-region">${esc(t("region"))}</label><input type="text" id="d-region" class="mono" value="${esc(d.region)}" placeholder="auto"></div>
+        <div class="field full"><label for="d-prefix">${esc(t("prefix"))}</label><input type="text" id="d-prefix" class="mono" value="${esc(d.type === "s3" ? d.base_path : "")}" placeholder="${esc(t("optional"))}"></div>
+        <div class="field full"><label for="d-cred-s3">${esc(t("accessKey"))}</label>${credSelect("d-cred-s3", "access_key", cred("access_key"), true)}</div>
+        <div class="field" data-new-cred="s3" hidden><label for="d-keyid">${esc(t("keyId"))}</label><input type="text" id="d-keyid" class="mono"></div>
+        <div class="field" data-new-cred="s3" hidden><label for="d-secret">${esc(t("secretKey"))}</label><input type="password" id="d-secret" class="mono" autocomplete="new-password"></div>
+      </div>
+      <div class="fields" data-dest-for="gdrive" style="margin-top: 16px">
+        <div class="field full"><label for="d-cred-gdrive">${esc(t("googleAccount"))}</label>${credSelect("d-cred-gdrive", "oauth_google", cred("oauth_google"), false)}
+          <div class="help">${esc(t("googleAccountHelp"))}</div></div>
+        <div class="field full"><label for="d-root">${esc(t("driveFolder"))}</label><input type="text" id="d-root" value="${esc(d.type === "gdrive" ? d.base_path || "Ferry" : "Ferry")}">
+          <div class="help">${esc(t("driveFolderHelp"))}</div></div>
       </div>
       ${actions(existing ? `<button type="submit" class="btn ghost danger" data-action="delete"><i class="ph ph-trash"></i>${esc(t("delete"))}</button>` : "",
         `<button type="submit" class="btn" data-action="test"><i class="ph ph-plugs-connected"></i>${esc(t("test"))}</button>`)}`,
@@ -1305,27 +1376,37 @@ function openDestEditor(id) {
       const sync = () => {
         const type = $("input[name=dest-type]:checked", root).value;
         root.querySelectorAll("[data-dest-for]").forEach((el) => (el.hidden = el.dataset.destFor !== type));
-        root.querySelectorAll("[data-new-cred]").forEach((el) => (el.hidden = $("#d-cred").value !== "__new"));
+        root.querySelectorAll("[data-new-cred]").forEach((el) => (el.hidden = $(`#d-cred-${el.dataset.newCred}`).value !== "__new"));
       };
       root.addEventListener("change", sync); sync();
     },
     onSave: async (action) => {
       if (action === "delete") {
-        await saveSettings((s) => { s.destinations = s.destinations.filter((x) => x.id !== id); if (s.defaults.destination === id) s.defaults.destination = ""; });
+        await saveSettings((s) => {
+          s.destinations = s.destinations.filter((x) => x.id !== id);
+          if (s.defaults.destination === id) s.defaults.destination = "";
+          s.defaults.mirrors = (s.defaults.mirrors || []).filter((m) => m !== id);
+        });
         toast(t("deleted")); return;
       }
       const type = $("input[name=dest-type]:checked").value;
-      let credId = $("#d-cred").value || null, newCred = null;
-      const host = $("#d-host").value.trim();
-      if (type === "smb" && credId === "__new") {
+      const host = $("#d-host").value.trim(), endpoint = $("#d-endpoint").value.trim(), bucket = $("#d-bucket").value.trim();
+      const taken = settings.credentials.map((c) => c.id);
+      let credId = type === "local" ? null : $(`#d-cred-${type}`).value || null, newCred = null;
+      if (credId === "__new" && type === "smb") {
         const user = $("#d-user").value.trim();
-        credId = slug(`${user}-${host}`, settings.credentials.map((c) => c.id));
+        credId = slug(`${user}-${host}`, taken);
         newCred = { id: credId, name: `${user}@${host}`, kind: "password", username: user, password: $("#d-pass").value };
+      } else if (credId === "__new" && type === "s3") {
+        const keyId = $("#d-keyid").value.trim();
+        credId = slug(`${bucket || "s3"}-key`, taken);
+        newCred = { id: credId, name: `${bucket || "S3"} key`, kind: "access_key", key_id: keyId, secret: $("#d-secret").value };
       }
-      const destId = existing ? existing.id : slug($("#d-name").value || host || type, settings.destinations.map((x) => x.id));
-      const next = { ...d, id: destId, type, name: $("#d-name").value.trim() || host || $("#d-path").value.trim(),
-        host, share: $("#d-share").value.trim(), base_path: $("#d-base").value.trim(), path: $("#d-path").value.trim(),
-        credentials: type === "smb" ? credId : null };
+      const base = { smb: $("#d-base").value.trim(), s3: $("#d-prefix").value.trim(), gdrive: $("#d-root").value.trim() || "Ferry" }[type] ?? "";
+      const fallbackName = { smb: host, local: $("#d-path").value.trim(), s3: bucket, gdrive: "Google Drive" }[type];
+      const destId = existing ? existing.id : slug($("#d-name").value || fallbackName || type, settings.destinations.map((x) => x.id));
+      const next = { ...d, id: destId, type, name: $("#d-name").value.trim() || fallbackName, host, share: $("#d-share").value.trim(),
+        base_path: base, path: $("#d-path").value.trim(), endpoint, bucket, region: $("#d-region").value.trim(), credentials: credId };
       await saveSettings((s) => {
         if (newCred) s.credentials.push(newCred);
         s.destinations = existing ? s.destinations.map((x) => (x.id === destId ? next : x)) : [...s.destinations, next];
@@ -1342,24 +1423,87 @@ function openDestEditor(id) {
   });
 }
 
-function openCredEditor(id) {
-  const c = id ? credById(id) : { id: "", name: "", kind: "password", username: "", password: "" };
+const CRED_KINDS = [
+  { kind: "password", icon: "ph-user", label: "credPassword" },
+  { kind: "access_key", icon: "ph-key", label: "credAccessKey" },
+  { kind: "oauth_google", icon: "ph-google-logo", label: "credGoogle" },
+];
+function openCredEditor(id, kindHint) {
+  const c = id ? structuredClone(credById(id))
+    : { id: "", name: "", kind: kindHint || "password", username: "", password: "", key_id: "", secret: "", client_id: "", client_secret: "", account: "", refresh_token: "" };
+  const seg = CRED_KINDS.map((x) => `<input type="radio" name="cred-kind" value="${x.kind}" id="ck-${x.kind}" ${x.kind === c.kind ? "checked" : ""} ${id ? "disabled" : ""}>
+    <label for="ck-${x.kind}"><i class="ph ${x.icon}"></i><span>${esc(t(x.label))}</span></label>`).join("");
+  const connected = c.kind === "oauth_google" && c.refresh_token;
   openEditor({
-    icon: "ph-key", title: id ? c.name || c.username || c.id : t("newCredentials"),
-    body: `<div class="fields">
-        <div class="field full"><label for="c-name">${esc(t("name"))}</label><input type="text" id="c-name" value="${esc(c.name)}"></div>
+    icon: "ph-key", title: id ? credLabel(c) : t("newCredentials"),
+    body: `<div class="seg" style="margin-bottom: 16px; display: inline-flex; flex-wrap: wrap">${seg}</div>
+      <div class="fields"><div class="field full"><label for="c-name">${esc(t("name"))}</label><input type="text" id="c-name" value="${esc(c.name)}"></div></div>
+      <div class="fields" data-cred-for="password" style="margin-top: 16px">
         <div class="field"><label for="c-user">${esc(t("username"))}</label><input type="text" id="c-user" value="${esc(c.username)}"></div>
         <div class="field"><label for="c-pass">${esc(t("password"))}</label><input type="password" id="c-pass" value="${esc(c.password)}" autocomplete="new-password"></div>
-      </div>${actions(id ? `<button type="submit" class="btn ghost danger" data-action="delete"><i class="ph ph-trash"></i>${esc(t("delete"))}</button>` : "")}`,
+      </div>
+      <div class="fields" data-cred-for="access_key" style="margin-top: 16px">
+        <div class="field"><label for="c-keyid">${esc(t("keyId"))}</label><input type="text" id="c-keyid" class="mono" value="${esc(c.key_id)}"></div>
+        <div class="field"><label for="c-secret">${esc(t("secretKey"))}</label><input type="password" id="c-secret" class="mono" value="${esc(c.secret)}" autocomplete="new-password"></div>
+        <div class="field full"><div class="help">${esc(t("accessKeyHelp"))}</div></div>
+      </div>
+      <div data-cred-for="oauth_google" style="margin-top: 16px">
+        <div class="fields">
+          <div class="field full"><label for="c-client">${esc(t("oauthClientId"))}</label><input type="text" id="c-client" class="mono" value="${esc(c.client_id)}"></div>
+          <div class="field full"><label for="c-client-secret">${esc(t("oauthClientSecret"))}</label><input type="password" id="c-client-secret" class="mono" value="${esc(c.client_secret)}" autocomplete="new-password"></div>
+        </div>
+        <div class="hint"><i class="ph ph-info"></i><span>${esc(t("oauthHelp"))}</span></div>
+        <div class="preview" id="c-google" style="margin-top: 14px">
+          <span class="k">${esc(t("googleAccount"))}</span>
+          <span>${connected ? esc(t("googleConnected", { account: c.account || "Google" })) : esc(t("googleNotConnected"))}</span>
+          <div id="c-google-code" hidden></div>
+          <div><button type="submit" class="btn sm" data-action="connect" style="margin-top: 6px"><i class="ph ph-google-logo"></i>${esc(t(connected ? "googleReconnect" : "googleConnect"))}</button></div>
+        </div>
+      </div>
+      ${actions(id ? `<button type="submit" class="btn ghost danger" data-action="delete"><i class="ph ph-trash"></i>${esc(t("delete"))}</button>` : "")}`,
+    onOpen: (root) => {
+      const sync = () => {
+        const kind = $("input[name=cred-kind]:checked", root).value;
+        root.querySelectorAll("[data-cred-for]").forEach((el) => (el.hidden = el.dataset.credFor !== kind));
+      };
+      root.addEventListener("change", sync); sync();
+    },
     onSave: async (action) => {
       if (action === "delete") { await saveSettings((s) => { s.credentials = s.credentials.filter((x) => x.id !== id); }); toast(t("deleted")); return; }
-      const user = $("#c-user").value.trim();
-      const next = { ...c, id: id || slug($("#c-name").value || user, settings.credentials.map((x) => x.id)),
-        name: $("#c-name").value.trim() || user, username: user, password: $("#c-pass").value };
+      const kind = $("input[name=cred-kind]:checked").value;
+      const user = $("#c-user").value.trim(), keyId = $("#c-keyid").value.trim();
+      const credId = id || slug($("#c-name").value || user || keyId || kind, settings.credentials.map((x) => x.id));
+      const next = { ...c, id: credId, kind, name: $("#c-name").value.trim() || user || keyId || t(CRED_KINDS.find((x) => x.kind === kind).label),
+        username: user, password: $("#c-pass").value, key_id: keyId, secret: $("#c-secret").value,
+        client_id: $("#c-client").value.trim(), client_secret: $("#c-client-secret").value };
       await saveSettings((s) => { s.credentials = id ? s.credentials.map((x) => (x.id === id ? next : x)) : [...s.credentials, next]; });
+      if (action === "connect") { await connectGoogle(credId); return false; }
       toast(t("saved"));
     },
   });
+}
+async function connectGoogle(credId) {
+  openCredEditor(credId);
+  const box = $("#c-google-code");
+  const flow = await post(`/api/credentials/${encodeURIComponent(credId)}/google/start`);
+  box.hidden = false;
+  box.innerHTML = `<div style="margin: 8px 0">${esc(t("googleCodeStep"))}</div>
+    <a class="btn sm" href="${esc(flow.verification_url)}" target="_blank" rel="noopener"><i class="ph ph-arrow-square-out"></i>${esc(flow.verification_url)}</a>
+    <div class="num" style="font-size: 26px; letter-spacing: .12em; margin: 10px 0 4px">${esc(flow.user_code)}</div>
+    <div class="small muted">${esc(t("googleWaiting"))}</div>`;
+  const deadline = Date.now() + flow.expires_in * 1000;
+  while (Date.now() < deadline && $("#editor").open && $("#c-google-code") === box) {
+    await new Promise((r) => setTimeout(r, Math.max(flow.interval, 3) * 1000));
+    try {
+      const r = await post(`/api/credentials/${encodeURIComponent(credId)}/google/poll`);
+      if (r.status === "ok") {
+        settings = await api("/api/settings"); renderSettings();
+        toast(t("googleConnected", { account: r.account || "Google" }));
+        openCredEditor(credId);
+        return;
+      }
+    } catch (err) { toast(err.message, true); return; }
+  }
 }
 
 function openPrinterEditor() {
@@ -1419,7 +1563,7 @@ async function discoverHosts(btn) {
 async function browseShares(btn) {
   const host = $("#d-host").value.trim();
   if (!host) { toast(t("pickHostFirst"), true); return; }
-  const box = $("#d-shares"), cred = $("#d-cred").value;
+  const box = $("#d-shares"), cred = $("#d-cred-smb").value;
   btn.disabled = true; box.hidden = false;
   box.innerHTML = `<div class="skeleton" style="height: 48px"></div>`;
   const body = cred === "__new" ? { host, username: $("#d-user").value, password: $("#d-pass").value }
@@ -1509,7 +1653,7 @@ document.addEventListener("click", async (e) => {
   if (!el) return;
   const d = el.dataset;
   if (d.close) { $(`#${d.close}`).hidden = true; return; }
-  if (d.host) { $("#d-host").value = d.host; $("#d-hosts").hidden = true; $("#d-cred").focus(); return; }
+  if (d.host) { $("#d-host").value = d.host; $("#d-hosts").hidden = true; $("#d-cred-smb").focus(); return; }
   if (d.share) { $("#d-share").value = d.share; $("#d-shares").hidden = true; return; }
   if ("scan" in d) { scanBle(); return; }
   if ("addPrinter" in d) { openPrinterEditor(); return; }

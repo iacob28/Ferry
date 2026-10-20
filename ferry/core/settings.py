@@ -21,8 +21,8 @@ VERSION = 2
 # Placeholders available in a destination path and in the folder layout.
 TEMPLATE_FIELDS = ("year", "month", "day", "date", "camera", "provider", "device", "model")
 # Keys holding secrets, wherever they appear (credentials, device config); masked by the API.
-SECRET_KEYS = frozenset({"password", "secret", "refresh_token", "access_code"})
-POLICY_FIELDS = ("destination", "credentials", "path", "folder_template", "delete_after_sync")
+SECRET_KEYS = frozenset({"password", "secret", "refresh_token", "access_code", "client_secret"})
+POLICY_FIELDS = ("destination", "credentials", "path", "folder_template", "delete_after_sync", "mirrors")
 # Keys only GoPro Sync (version 1) settings have.
 V1_KEYS = frozenset({"target", "smb", "local_path", "cameras", "usb_enabled", "ble_enabled", "folder_template",
                      "delete_after_sync", "sleep_after_sync", "ble_cooldown_minutes", "wifi_interface"})
@@ -94,7 +94,9 @@ class Credential(BaseModel):
     # access_key (S3 / R2)
     key_id: str = ""
     secret: str = ""
-    # oauth_google
+    # oauth_google: the user's own OAuth client ("TVs and limited input devices") and the grant
+    client_id: str = ""
+    client_secret: str = ""
     refresh_token: str = ""
     account: str = ""
 
@@ -131,6 +133,8 @@ class SyncOverrides(BaseModel):
     path: str | None = None
     folder_template: str | None = None
     delete_after_sync: bool | None = None
+    # Extra destinations that get a copy too (an off-site backup, say), each with its own credentials.
+    mirrors: list[str] | None = None
 
     _check = field_validator("path", "folder_template")(_check_optional_template)
 
@@ -140,6 +144,7 @@ class SyncDefaults(BaseModel):
     path: str = "{provider}"
     folder_template: str = "{year}/{date}"
     delete_after_sync: bool = False
+    mirrors: list[str] = Field(default_factory=list)
 
     _check = field_validator("path", "folder_template")(check_template)
 
@@ -168,6 +173,7 @@ class SyncPolicy:
     path: str
     folder_template: str
     delete_after_sync: bool
+    mirrors: list[str] = field(default_factory=list)
     # Which layer each value came from: "global" | "provider" | "device".
     origin: dict[str, str] = field(default_factory=dict)
 
@@ -205,12 +211,13 @@ class Settings(BaseModel):
                 raise ValueError(f"duplicate {kind} id: {', '.join(sorted(dupes))}")
         dests = {d.id for d in self.destinations}
         creds = {c.id for c in self.credentials}
-        layers = [("defaults", self.defaults.destination, None)]
-        layers += [(f"provider {k}", p.sync.destination, p.sync.credentials) for k, p in self.providers.items()]
-        layers += [(f"device {d.id}", d.sync.destination, d.sync.credentials) for d in self.devices]
-        for where, dest, cred in layers:
-            if dest and dest not in dests:
-                raise ValueError(f"{where}: unknown destination {dest!r}")
+        layers = [("defaults", self.defaults.destination, None, self.defaults.mirrors)]
+        layers += [(f"provider {k}", p.sync.destination, p.sync.credentials, p.sync.mirrors) for k, p in self.providers.items()]
+        layers += [(f"device {d.id}", d.sync.destination, d.sync.credentials, d.sync.mirrors) for d in self.devices]
+        for where, dest, cred, mirrors in layers:
+            for target in [dest, *(mirrors or [])]:
+                if target and target not in dests:
+                    raise ValueError(f"{where}: unknown destination {target!r}")
             if cred and cred not in creds:
                 raise ValueError(f"{where}: unknown credentials {cred!r}")
         for d in self.destinations:

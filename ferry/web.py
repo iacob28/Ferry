@@ -8,7 +8,7 @@ from contextlib import aclosing, asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ValidationError
 
@@ -18,6 +18,7 @@ from .core.engine import thumb_name
 from .core.service import SyncService
 from .core.settings import SECRET_KEYS, VERSION, Settings, SyncOverrides, template_fields
 from .destinations import DestinationError, resolve_destination
+from .destinations import gdrive
 
 STATIC = Path(__file__).parent / "static"
 MASK = "********"
@@ -272,6 +273,58 @@ def create_app(service: SyncService, auth: AuthStore) -> FastAPI:
         values = {k: getattr(policy, k) for k in policy.origin}
         return {"policy": values, "origin": policy.origin, "example": example, "location": location}
 
+    # --- Google sign-in (device flow) -----------------------------------------
+
+    pending_google: dict[str, dict] = {}
+
+    def _google_credential(cred_id: str):
+        cred = service.settings.credential(cred_id)
+        if cred is None or cred.kind != "oauth_google":
+            raise HTTPException(404, "unknown Google credentials")
+        if not (cred.client_id and cred.client_secret):
+            raise HTTPException(422, "enter the OAuth client ID and secret first")
+        return cred
+
+    @app.post("/api/credentials/{cred_id}/google/start")
+    async def google_start(cred_id: str):
+        cred = _google_credential(cred_id)
+        try:
+            flow = await asyncio.to_thread(gdrive.start_device_flow, cred.client_id)
+        except DestinationError as exc:
+            raise HTTPException(400, str(exc))
+        pending_google[cred_id] = flow
+        return {"user_code": flow["user_code"], "verification_url": flow.get("verification_url") or flow.get("verification_uri"),
+                "interval": flow.get("interval", 5), "expires_in": flow.get("expires_in", 1800)}
+
+    @app.post("/api/credentials/{cred_id}/google/poll")
+    async def google_poll(cred_id: str):
+        cred = _google_credential(cred_id)
+        flow = pending_google.get(cred_id)
+        if flow is None:
+            raise HTTPException(409, "start the Google sign-in first")
+        try:
+            refresh = await asyncio.to_thread(gdrive.poll_device_flow, cred.client_id, cred.client_secret, flow["device_code"])
+        except gdrive.OAuthPending:
+            return {"status": "pending"}
+        except DestinationError as exc:
+            pending_google.pop(cred_id, None)
+            raise HTTPException(400, str(exc))
+        pending_google.pop(cred_id, None)
+        connected = cred.model_copy(update={"refresh_token": refresh})
+        try:
+            account = await asyncio.to_thread(gdrive.account_email, connected)
+        except DestinationError:
+            account = ""
+
+        def store(settings: Settings) -> None:
+            c = settings.credential(cred_id)
+            if c is not None:
+                c.refresh_token, c.account = refresh, account or c.account
+
+        service.settings_store.update(store)
+        service.log("success", f"Google account connected{f': {account}' if account else ''}")
+        return {"status": "ok", "account": account}
+
     # --- devices -----------------------------------------------------------
 
     def _save_devices(change) -> dict:
@@ -421,6 +474,12 @@ def create_app(service: SyncService, auth: AuthStore) -> FastAPI:
             raise HTTPException(502, f"cannot open {item['dest']} on the destination: {exc}") from exc
         if remote is None:
             raise HTTPException(502, f"{item['dest']} is no longer on the destination")
+        if "presigned_url" in destination.capabilities:
+            # Object stores serve the bytes themselves (with ranges); the Pi stays out of the way.
+            url = destination.presigned_url(item["dest"])
+            secure_page = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
+            if url.startswith("https://") or not secure_page:
+                return RedirectResponse(url, status_code=307)
         size = remote.size
         try:
             span = _byte_range(request.headers.get("range"), size)

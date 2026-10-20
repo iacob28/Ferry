@@ -16,8 +16,9 @@ Sources:
 - **Bambu Lab 3D printers** (P1S, P1P, X1, A1): print timelapses from the SD card.
 
 Destinations, set up once and shared by every device: SMB shares (Synology, QNAP, TrueNAS,
-Windows, Samba; hosts and shares can be discovered from the UI), local folders, S3-compatible
-object storage (Amazon S3, Cloudflare R2, Backblaze B2, MinIO, Wasabi) and Google Drive.
+Windows, Samba; hosts and shares can be discovered from the UI), SFTP (password or SSH key),
+FTP / FTPES / FTPS, local folders, S3-compatible object storage (Amazon S3, Cloudflare R2,
+Backblaze B2, MinIO, Wasabi) and Google Drive.
 
 The web UI (English and Romanian, admin password) shows live progress per device, a library of
 everything synced, history and logs. Ferry was called GoPro Sync until 0.2.0.
@@ -150,6 +151,19 @@ Every field in the provider and device editors shows the value it inherits until
 **Also copy to** sends every file to more destinations as well, for example the NAS plus an R2
 bucket as an off-site copy. A file only counts as synced, and is only deleted from the device,
 once every destination has it.
+
+### SFTP and FTP
+
+- **SFTP**: host, port (22), folder on the server (absolute with a leading `/`, otherwise in the
+  user's home), and a username with a password or an SSH key (OpenSSH Ed25519/ECDSA/RSA, kept
+  under Credentials). The host key is pinned on the first test or sync; a server that later shows
+  another key is refused until you clear the pin.
+- **FTP**: FTPES (AUTH TLS on 21, the default), FTPS (implicit TLS on 990) or plain FTP (password
+  in the clear: trusted LAN only). The TLS certificate is pinned the same way, and data channels
+  resume the control channel's TLS session, as vsftpd and most NAS servers require.
+
+Both upload to `<name>.partial` and rename when complete, so a half-written file is never taken
+for a finished one.
 
 ### Cloud destinations
 

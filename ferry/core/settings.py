@@ -21,7 +21,7 @@ VERSION = 2
 # Placeholders available in a destination path and in the folder layout.
 TEMPLATE_FIELDS = ("year", "month", "day", "date", "camera", "provider", "device", "model")
 # Keys holding secrets, wherever they appear (credentials, device config); masked by the API.
-SECRET_KEYS = frozenset({"password", "secret", "refresh_token", "access_code", "client_secret"})
+SECRET_KEYS = frozenset({"password", "secret", "refresh_token", "access_code", "client_secret", "private_key"})
 POLICY_FIELDS = ("destination", "credentials", "path", "folder_template", "delete_after_sync", "mirrors")
 # Keys only GoPro Sync (version 1) settings have.
 V1_KEYS = frozenset({"target", "smb", "local_path", "cameras", "usb_enabled", "ble_enabled", "folder_template",
@@ -88,9 +88,11 @@ def render_key(path: str, folder_template: str, fields: dict[str, str], name: st
 class Credential(BaseModel):
     id: str
     name: str = ""
-    kind: Literal["password", "access_key", "oauth_google"] = "password"
+    kind: Literal["password", "ssh_key", "access_key", "oauth_google"] = "password"
     username: str = ""
-    password: str = ""
+    password: str = ""  # ssh_key: the key's passphrase, if any
+    # ssh_key: an OpenSSH private key (Ed25519, ECDSA or RSA), PEM text
+    private_key: str = ""
     # access_key (S3 / R2)
     key_id: str = ""
     secret: str = ""
@@ -105,8 +107,9 @@ class DestinationConfig(BaseModel):
     id: str
     name: str = ""
     type: str = "smb"
-    # smb
+    # smb, sftp, ftp
     host: str = ""
+    port: int = 0  # 0: the protocol's default
     share: str = ""
     # smb: folder inside the share; s3: key prefix; gdrive: root folder
     base_path: str = ""
@@ -116,6 +119,10 @@ class DestinationConfig(BaseModel):
     endpoint: str = ""
     region: str = ""
     bucket: str = ""
+    # ftp: "none" (plain FTP), "explicit" (AUTH TLS, port 21) or "implicit" (port 990)
+    ftp_tls: Literal["none", "explicit", "implicit"] = "explicit"
+    # sftp host key / FTPS certificate pinned on first connection ("SHA256:..." / hex digest)
+    fingerprint: str = ""
     credentials: str | None = None
 
 

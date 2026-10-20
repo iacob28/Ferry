@@ -31,6 +31,15 @@ class Destination(ABC):
     credential_kinds: frozenset[str] = frozenset()
     # "range_read", "presigned_url" (presigned_url(key) gives a link the browser can fetch directly).
     capabilities: frozenset[str] = frozenset()
+    # Set by resolve_destination: saves what a destination learns on first contact (a pinned key).
+    on_learn: Callable[[dict], None] | None = None
+
+    def close(self) -> None:
+        """Drops a kept-open connection (SFTP, FTP); the next call reconnects."""
+
+    def _learn(self, **updates) -> None:
+        if self.on_learn is not None:
+            self.on_learn(updates)
 
     @abstractmethod
     def describe(self, key: str = "") -> str: ...

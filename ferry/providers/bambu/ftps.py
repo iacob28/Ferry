@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import ftplib
-import hashlib
 import re
-import socket
-import ssl
 from dataclasses import dataclass
 from typing import Callable
+
+from ...ftpclient import CertificateChanged, ImplicitFtps
 
 PORT = 990
 USER = "bblp"
@@ -37,57 +36,21 @@ def parse_list(lines: list[str]) -> list[RemoteFile]:
     return files
 
 
-class ImplicitFtps(ftplib.FTP_TLS):
-    """ftplib speaks explicit FTPS (AUTH TLS); Bambu printers want TLS from the first byte.
-
-    The printer's certificate is self-signed, so it is pinned instead of verified: the first
-    connection records its SHA-256 fingerprint and later ones must present the same certificate.
-    """
-
-    def __init__(self, fingerprint: str | None = None):
-        context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        context.check_hostname = False
-        context.verify_mode = ssl.CERT_NONE
-        super().__init__(context=context, timeout=TIMEOUT)
-        self.expected_fingerprint = fingerprint
-        self.fingerprint: str | None = None
-
-    def connect(self, host: str = "", port: int = PORT, timeout: float = TIMEOUT, source_address=None) -> str:
-        self.host, self.port, self.timeout = host, port, timeout
-        raw = socket.create_connection((host, port), timeout)
-        self.sock = self.context.wrap_socket(raw, server_hostname=host)
-        cert = self.sock.getpeercert(binary_form=True) or b""
-        self.fingerprint = hashlib.sha256(cert).hexdigest()
-        if self.expected_fingerprint and self.fingerprint != self.expected_fingerprint:
-            self.sock.close()
-            raise FtpsError("the printer presented a different TLS certificate than before; if it was reset "
-                            "or replaced, set it up again")
-        self.af = self.sock.family
-        self.file = self.sock.makefile("r", encoding=self.encoding)
-        self.welcome = self.getresp()
-        return self.welcome
-
-    def ntransfercmd(self, cmd, rest=None):
-        # Bambu's server only accepts data connections that resume the control channel's TLS session.
-        conn, size = ftplib.FTP.ntransfercmd(self, cmd, rest)
-        if self._prot_p:
-            conn = self.context.wrap_socket(conn, server_hostname=self.host, session=self.sock.session)
-        return conn, size
-
-
 class PrinterFiles:
     """Blocking client; the provider runs it in a worker thread."""
 
     def __init__(self, host: str, access_code: str, fingerprint: str | None = None, port: int = PORT):
         self.host, self.port = host, port
         self.access_code = access_code
-        self.ftp = ImplicitFtps(fingerprint)
+        self.ftp = ImplicitFtps(fingerprint, timeout=TIMEOUT)
 
     def open(self) -> PrinterFiles:
         try:
             self.ftp.connect(self.host, self.port)
             self.ftp.login(USER, self.access_code)
             self.ftp.prot_p()
+        except CertificateChanged as exc:
+            raise FtpsError(str(exc).replace("the server", "the printer")) from exc
         except ftplib.error_perm as exc:
             raise FtpsError(f"login refused ({exc}); check the access code on the printer screen") from exc
         except (OSError, EOFError, ftplib.Error) as exc:

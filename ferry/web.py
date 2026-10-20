@@ -22,6 +22,8 @@ from .destinations import gdrive
 
 STATIC = Path(__file__).parent / "static"
 MASK = "********"
+# Sent by the UI to forget a pinned host key or certificate on purpose (an empty value keeps it).
+CLEAR_PIN = "__clear__"
 MEDIA_TYPES = {"mp4": "video/mp4", "mov": "video/quicktime", "jpg": "image/jpeg", "jpeg": "image/jpeg",
                "gpr": "application/octet-stream", "wav": "audio/wav"}
 # Reachable without a session: the page shell and the sign-in/setup endpoints.
@@ -124,6 +126,20 @@ def _merge(current: Settings, incoming: dict) -> Settings:
     incoming = dict(incoming)
     saved = {c.id: c.model_dump() for c in current.credentials}
     incoming["credentials"] = [_unmask(dict(c), saved.get(c.get("id"))) for c in incoming.get("credentials", [])]
+    # Pins are learned by the server during tests and syncs; a form opened before that sends ""
+    # and must not erase them. Only an explicit clear (or a different server) resets a pin.
+    pinned = {d.id: d for d in current.destinations}
+    dests = []
+    for d in incoming.get("destinations", []):
+        d = dict(d)
+        old = pinned.get(d.get("id"))
+        if d.get("fingerprint") == CLEAR_PIN:
+            d["fingerprint"] = ""
+        elif not d.get("fingerprint") and old is not None and (old.type, old.host, old.port) == (
+                d.get("type"), d.get("host"), d.get("port", 0)):
+            d["fingerprint"] = old.fingerprint
+        dests.append(d)
+    incoming["destinations"] = dests
     # Devices are managed through /api/devices, so a stale form cannot drop one a watcher just added.
     incoming["devices"] = [d.model_dump() for d in current.devices]
     incoming["version"] = VERSION
@@ -228,11 +244,15 @@ def create_app(service: SyncService, auth: AuthStore) -> FastAPI:
         return _public(settings)
 
     async def _test_destination(dest_id: str | None, credentials: str | None = None) -> dict:
+        target = None
         try:
-            target = resolve_destination(service.settings, dest_id, credentials)
+            target = resolve_destination(service.settings, dest_id, credentials, service.remember_destination)
             await target.test()
         except Exception as exc:
             raise HTTPException(400, f"{type(exc).__name__}: {exc}")
+        finally:
+            if target is not None:
+                await asyncio.to_thread(target.close)
         return {"ok": True, "target": target.describe()}
 
     @app.post("/api/target/test")
@@ -465,15 +485,21 @@ def create_app(service: SyncService, auth: AuthStore) -> FastAPI:
     @app.get("/api/library/{item_id}/media")
     async def library_media(item_id: int, request: Request, download: bool = False):
         item = _item(item_id)
+        destination = None
         try:
             settings = service.settings
             # Files synced before destinations existed live on the default one.
-            destination = resolve_destination(settings, item["dest_id"] or settings.defaults.destination, item["cred_id"])
+            destination = resolve_destination(settings, item["dest_id"] or settings.defaults.destination, item["cred_id"],
+                                              service.remember_destination)
             remote = await destination.stat(item["dest"])
-        except (DestinationError, OSError) as exc:
+            if remote is None:
+                raise HTTPException(502, f"{item['dest']} is no longer on the destination")
+        except (DestinationError, OSError, HTTPException) as exc:
+            if destination is not None:
+                await asyncio.to_thread(destination.close)
+            if isinstance(exc, HTTPException):
+                raise
             raise HTTPException(502, f"cannot open {item['dest']} on the destination: {exc}") from exc
-        if remote is None:
-            raise HTTPException(502, f"{item['dest']} is no longer on the destination")
         if "presigned_url" in destination.capabilities:
             # Object stores serve the bytes themselves (with ranges); the Pi stays out of the way.
             url = destination.presigned_url(item["dest"])
@@ -484,6 +510,7 @@ def create_app(service: SyncService, auth: AuthStore) -> FastAPI:
         try:
             span = _byte_range(request.headers.get("range"), size)
         except (HTTPException, ValueError):
+            await asyncio.to_thread(destination.close)
             raise HTTPException(416, "range not satisfiable", headers={"Content-Range": f"bytes */{size}"})
         start, end = span or (0, size - 1)
         name = item["path"].rsplit("/", 1)[-1]
@@ -493,11 +520,14 @@ def create_app(service: SyncService, auth: AuthStore) -> FastAPI:
             headers["Content-Range"] = f"bytes {start}-{end}/{size}"
 
         async def body():
-            async with aclosing(destination.open_range(item["dest"], start, end)) as chunks:
-                async for chunk in chunks:
-                    if await request.is_disconnected():
-                        break
-                    yield chunk
+            try:
+                async with aclosing(destination.open_range(item["dest"], start, end)) as chunks:
+                    async for chunk in chunks:
+                        if await request.is_disconnected():
+                            break
+                        yield chunk
+            finally:
+                await asyncio.to_thread(destination.close)
 
         media_type = MEDIA_TYPES.get(name.rsplit(".", 1)[-1].lower(), "application/octet-stream")
         return StreamingResponse(body(), status_code=206 if span else 200, media_type=media_type, headers=headers)

@@ -96,6 +96,14 @@ class SyncEngine:
 
     async def run(self, source: MediaSource, device: DeviceInfo,
                   keep_alive: Callable[[], Awaitable[None]] | None = None) -> RunResult:
+        try:
+            return await self._run(source, device, keep_alive)
+        finally:
+            for destination in (self.destination, *self.mirrors):
+                await asyncio.to_thread(destination.close)  # SFTP/FTP keep a connection open per run
+
+    async def _run(self, source: MediaSource, device: DeviceInfo,
+                   keep_alive: Callable[[], Awaitable[None]] | None) -> RunResult:
         device_id = device.id
         staging = self.staging / device_id.replace(":", "_")
         staging.mkdir(parents=True, exist_ok=True)

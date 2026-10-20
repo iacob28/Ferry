@@ -5,16 +5,16 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-IMAGE="${IMAGE:-harbor.dockerbit.com/gopro-sync/gopro-sync}"
+IMAGE="${IMAGE:-harbor.dockerbit.com/ferry/ferry}"
 VERSION="$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
 PLATFORMS="${PLATFORMS:-linux/arm64,linux/amd64}"
 
-if ! docker buildx inspect gopro-sync-builder >/dev/null 2>&1; then
-  docker buildx create --name gopro-sync-builder --driver docker-container >/dev/null
+if ! docker buildx inspect ferry-builder >/dev/null 2>&1; then
+  docker buildx create --name ferry-builder --driver docker-container >/dev/null
 fi
 
 docker buildx build \
-  --builder gopro-sync-builder \
+  --builder ferry-builder \
   --platform "$PLATFORMS" \
   --label "org.opencontainers.image.version=$VERSION" \
   --label "org.opencontainers.image.revision=$(git rev-parse --short HEAD)" \

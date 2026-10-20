@@ -1,8 +1,13 @@
-# GoPro Sync
+# Ferry
 
-Automatic offload for GoPro cameras. Plug a camera in, or simply switch it on near
-the server, and every new photo and video is copied to your NAS. The app verifies each
-file on the destination and can then free up the SD card.
+Automatic offload for the devices that fill up with media: cameras, drones, 3D printers.
+Plug a device in, or simply switch it on near the server, and every new photo and video is
+copied to your NAS. The app verifies each file on the destination and can then free up the
+device's storage.
+
+Supported today: **GoPro** cameras. In progress: DJI drones and other cameras over USB
+(mass storage), Bambu Lab printer timelapses, and cloud destinations (S3 / Cloudflare R2,
+Google Drive). Ferry was called GoPro Sync until 0.2.0.
 
 - **USB**: the camera shows up as a USB network device; any number of cameras in parallel.
 - **Wireless**: the server notices a paired camera over Bluetooth, turns on its Wi-Fi,
@@ -28,21 +33,27 @@ Tested with a HERO9 Black (Open GoPro API 2.0). Other cameras that speak the
 ## Install
 
 ```bash
-mkdir gopro-sync && cd gopro-sync
+mkdir ferry && cd ferry
 curl -O https://raw.githubusercontent.com/iacob28/GoPro_Sync/main/docker-compose.yml
 docker compose up -d
 ```
 
 Open `http://<host>:8780`, create the admin password, pick the destination and pair your
-cameras. Settings and state live in `./data` (override with `GOPRO_SYNC_DATA`).
+cameras. Settings and state live in `./data` (override with `FERRY_DATA`).
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `GOPRO_SYNC_PORT` | `8780` | Web UI port |
-| `GOPRO_SYNC_PASSWORD` | | Preset the admin password (otherwise set it in the browser) |
-| `GOPRO_SYNC_DATA` | `./data` | Host folder for settings, state and staging |
-| `GOPRO_SYNC_IMAGE` / `GOPRO_SYNC_TAG` | registry image / `latest` | Image to run |
+| `FERRY_PORT` | `8780` | Web UI port |
+| `FERRY_PASSWORD` | | Preset the admin password (otherwise set it in the browser) |
+| `FERRY_DATA` | `./data` | Host folder for settings, state and staging |
+| `FERRY_IMAGE` / `FERRY_TAG` | registry image / `latest` | Image to run |
 | `TZ` | `UTC` | Time zone for logs |
+
+### Upgrading from GoPro Sync
+
+The data folder is compatible: point `FERRY_DATA` at the old one and nothing is synced twice.
+Inside the container the app still reads the old `GOPRO_SYNC_*` variables when the
+`FERRY_*` ones are not set. Everyone is signed out once, because the session cookie was renamed.
 
 ### Behind Traefik
 
@@ -51,7 +62,7 @@ Because the app uses host networking, Traefik reaches it through the gateway of 
 network:
 
 ```bash
-GOPRO_SYNC_DOMAIN=gopro.example.lan TRAEFIK_UPSTREAM=http://172.19.0.1:8780 \
+FERRY_DOMAIN=ferry.example.lan TRAEFIK_UPSTREAM=http://172.19.0.1:8780 \
 TRAEFIK_CERTRESOLVER=myresolver \
 docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d
 ```
@@ -79,12 +90,21 @@ Dates come from the camera's clock. If a different file with the same name alrea
 Files already present with the same size are not uploaded twice, so several servers can
 share one destination.
 
+## Architecture
+
+- `ferry/core`: the offload engine (download to staging, upload, verify, optional delete),
+  sessions, settings and the SQLite bookkeeping. It only knows two contracts:
+- `ferry/providers`: one package per device family. A provider watches for its devices and
+  opens them as a `MediaSource` (`list_media`, `download`, `delete`, `thumbnail`).
+- `ferry/destinations`: where media goes (`stat`, atomic `put`, `open_range`). Keys are
+  relative POSIX paths, so object stores and cloud drives fit the same contract.
+
 ## Development
 
 ```bash
 uv venv && uv pip install -e ".[dev]"
 .venv/bin/pytest
-GOPRO_SYNC_DATA=./.dev-data .venv/bin/python -m gopro_sync   # http://localhost:8780
+FERRY_DATA=./.dev-data .venv/bin/python -m ferry   # http://localhost:8780
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 scripts/release.sh   # multi-arch build and push (IMAGE=... to override)
 ```
@@ -95,5 +115,5 @@ USB network devices or Bluetooth, so the container is for Linux hosts.
 ## Licenses
 
 Bundled assets: [Geist](https://vercel.com/font) (SIL Open Font License) and
-[Phosphor Icons](https://phosphoricons.com) (MIT), see `gopro_sync/static/vendor`.
+[Phosphor Icons](https://phosphoricons.com) (MIT), see `ferry/static/vendor`.
 GoPro is a trademark of GoPro, Inc.; this project is not affiliated with GoPro.

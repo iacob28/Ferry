@@ -3,12 +3,13 @@ import asyncio
 import pytest
 from fastapi.testclient import TestClient
 
-from gopro_sync.auth import AuthStore, hash_password, verify_password
-from gopro_sync.config import Settings, SettingsStore
-from gopro_sync.engine import RunResult
-from gopro_sync.service import Session, SyncService
-from gopro_sync.store import Store
-from gopro_sync.web import create_app
+from ferry.auth import AuthStore, hash_password, verify_password
+from ferry.core.engine import RunResult
+from ferry.core.service import SyncService
+from ferry.core.session import Session
+from ferry.core.settings import Settings, SettingsStore
+from ferry.core.store import Store
+from ferry.web import create_app
 
 
 def test_password_hash_roundtrip():
@@ -64,8 +65,8 @@ async def test_sessions_run_in_parallel_and_are_recorded(service):
             return f"HERO {name}", RunResult(files=1, bytes=10, deleted=0, skipped_existing=0)
         return run
 
-    service._start(Session("usb:a", "usb", "a", "A"), flow("A"))
-    service._start(Session("usb:b", "usb", "b", "B"), flow("B"))
+    service.start_session(Session("usb:a", "usb", "a", "A"), flow("A"))
+    service.start_session(Session("usb:b", "usb", "b", "B"), flow("B"))
     await asyncio.sleep(0.05)
     assert sorted(started) == ["A", "B"]
     assert service.snapshot()["state"] == "syncing"
@@ -86,14 +87,14 @@ async def test_cancel_one_session_keeps_the_other(service):
         await gate.wait()
         return "cam", RunResult(0, 0, 0, 0)
 
-    service._start(Session("usb:a", "usb", "a", "A"), slow)
-    service._start(Session("ble:b", "wifi", "b", "B", radio="wlan1"), slow)
-    service._radios_in_use.add("wlan1")
+    service.start_session(Session("usb:a", "usb", "a", "A"), slow)
+    service.start_session(Session("ble:b", "wifi", "b", "B", radio="wlan1"), slow)
+    service.radios_in_use.add("wlan1")
     await asyncio.sleep(0.01)
     assert service.cancel("ble:b") == 1
     await asyncio.sleep(0.05)
     assert list(service.sessions) == ["usb:a"]
-    assert "wlan1" not in service._radios_in_use
+    assert "wlan1" not in service.radios_in_use
     gate.set()
     await asyncio.sleep(0.05)
     statuses = sorted(r["status"] for r in service.store.recent_runs())

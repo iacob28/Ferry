@@ -10,7 +10,7 @@ from pathlib import Path
 
 import psutil
 
-from . import netutil
+from ... import netutil
 
 GOPRO_USB_VENDOR = "2672"
 # The camera serves 172.2X.1YZ.51 and leases the host an address in the same /24.

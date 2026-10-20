@@ -1,6 +1,6 @@
 [project]
 name = "ferry-offload"
-version = "0.2.2"
+version = "0.2.3"
 description = "Automatically offload cameras, drones and 3D printers to network storage"
 readme = "README.md"
 requires-python = ">=3.11"

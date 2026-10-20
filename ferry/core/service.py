@@ -181,11 +181,23 @@ class SyncService:
             self.events.publish({"type": "progress", "session": session.id, "progress": progress.snapshot()})
 
         policy = settings.effective(session.rules or session.provider, session.device)
-        destination = resolve_destination(settings, policy.destination, policy.credentials)
-        mirrors = [resolve_destination(settings, m) for m in policy.mirrors if m != policy.destination]
+        destination = resolve_destination(settings, policy.destination, policy.credentials, self.remember_destination)
+        mirrors = [resolve_destination(settings, m, on_learn=self.remember_destination)
+                   for m in policy.mirrors if m != policy.destination]
         return SyncEngine(self.store, policy, destination, self.staging,
                           lambda level, msg: self.log(level, f"{session.camera or session.name}: {msg}"), on_progress,
                           self.thumbs, mirrors)
+
+    def remember_destination(self, dest_id: str, updates: dict) -> None:
+        """Stores what a destination pinned on first contact (SSH host key, TLS certificate)."""
+        def apply(settings: Settings) -> None:
+            cfg = settings.destination(dest_id)
+            if cfg is not None:
+                for key, value in updates.items():
+                    setattr(cfg, key, value)
+
+        self.settings_store.update(apply)
+        self.log("info", f"destination {dest_id}: pinned {', '.join(f'{k} {v}' for k, v in updates.items())}")
 
     def identify(self, session: Session, device_id: str, label: str) -> tuple[str, str]:
         """Records who the device turned out to be, once connected."""

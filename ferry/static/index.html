@@ -208,6 +208,9 @@
   .field .help { font-size: 12px; color: var(--faint); }
   .with-btn { display: flex; gap: 8px; }
   .with-btn input { flex: 1; min-width: 0; }
+  textarea { font: inherit; font-size: 12.5px; color: var(--text); background: var(--surface-2); border: 0; border-radius: var(--r-ctl);
+             padding: 11px 14px; width: 100%; resize: vertical; box-shadow: inset 0 0 0 1px var(--hair); }
+  textarea:focus { outline: none; background: var(--surface); box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 4px var(--accent-soft); }
   input[type=text], input[type=password], input[type=number], select {
     font: inherit; font-size: 14px; color: var(--text); background: var(--surface-2); border: 0; border-radius: var(--r-ctl);
     padding: 11px 14px; width: 100%; box-shadow: inset 0 0 0 1px var(--hair), inset 0 1px 2px rgb(16 24 40 / .04);
@@ -652,6 +655,14 @@ const I18N = {
     googleWaiting: "Waiting for you to approve…",
     alsoCopyTo: "Also copy to", alsoCopyToD: "Every file also goes to these destinations (an off-site backup, for example). A file counts as synced, and can be deleted from the device, only once all of them have it.",
     none: "none",
+    sftp: "SFTP", ftp: "FTP / FTPS", port: "Port", remoteFolder: "Folder on the server",
+    remoteFolderHelp: "Starting with / it is absolute; otherwise it is inside the user's home folder.",
+    sftpCredHelp: "A username with a password, or with an SSH key (add keys under Credentials).",
+    pinnedKey: "Pinned host key", pinnedCert: "Pinned certificate", clearPin: "Clear",
+    ftpSecurity: "Security", ftp_explicit: "FTPES (TLS)", ftp_implicit: "FTPS (port 990)", ftp_none: "Plain FTP",
+    ftpSecurityHelp: "FTPES upgrades port 21 to TLS; FTPS speaks TLS on 990. Plain FTP sends the password unencrypted: only on a trusted LAN. The server's certificate is pinned on first contact.",
+    credSshKey: "SSH key", privateKey: "Private key", passphrase: "Passphrase",
+    privateKeyHelp: "OpenSSH format (Ed25519, ECDSA or RSA). Put the matching public key in ~/.ssh/authorized_keys on the server.",
   },
   ro: {
     destination: "Destinație", files: "Fișiere", speed: "Viteză", remaining: "Timp rămas", battery: "Baterie",
@@ -751,6 +762,14 @@ const I18N = {
     googleWaiting: "Se așteaptă aprobarea…",
     alsoCopyTo: "Copiază și în", alsoCopyToD: "Fiecare fișier ajunge și în aceste destinații (de exemplu un backup off-site). Un fișier e considerat sincronizat, și poate fi șters de pe dispozitiv, doar după ce e în toate.",
     none: "niciuna",
+    sftp: "SFTP", ftp: "FTP / FTPS", port: "Port", remoteFolder: "Folder pe server",
+    remoteFolderHelp: "Dacă începe cu / e absolut; altfel e în folderul home al utilizatorului.",
+    sftpCredHelp: "Un utilizator cu parolă sau cu cheie SSH (cheile se adaugă la Credențiale).",
+    pinnedKey: "Cheia serverului fixată", pinnedCert: "Certificat fixat", clearPin: "Șterge",
+    ftpSecurity: "Securitate", ftp_explicit: "FTPES (TLS)", ftp_implicit: "FTPS (portul 990)", ftp_none: "FTP simplu",
+    ftpSecurityHelp: "FTPES trece portul 21 pe TLS; FTPS vorbește TLS pe 990. FTP simplu trimite parola necriptată: doar într-o rețea locală de încredere. Certificatul serverului se fixează la prima conexiune.",
+    credSshKey: "Cheie SSH", privateKey: "Cheie privată", passphrase: "Parolă cheie",
+    privateKeyHelp: "Format OpenSSH (Ed25519, ECDSA sau RSA). Pune cheia publică pereche în ~/.ssh/authorized_keys pe server.",
   },
 };
 const LOCALES = { en: "en-GB", ro: "ro-RO" };
@@ -1053,6 +1072,12 @@ function describeDest(dest, key = "") {
     return parts.join("\\");
   }
   if (dest.type === "local") return [dest.path || "?", key].filter(Boolean).join("/");
+  if (dest.type === "sftp" || dest.type === "ftp") {
+    const scheme = dest.type === "sftp" ? "sftp" : { none: "ftp", explicit: "ftpes", implicit: "ftps" }[dest.ftp_tls || "explicit"];
+    const user = credById(dest.credentials)?.username;
+    const where = [dest.base_path, key].flatMap((p) => (p || "").split("/")).filter(Boolean).join("/");
+    return `${scheme}://${user ? user + "@" : ""}${dest.host || "?"}${dest.port ? ":" + dest.port : ""}/${where}`;
+  }
   const join = (...parts) => parts.flatMap((p) => (p || "").split("/")).filter(Boolean).join("/");
   if (dest.type === "s3") {
     let host = dest.endpoint || `s3.${dest.region || "us-east-1"}.amazonaws.com`;
@@ -1089,7 +1114,7 @@ function renderSettings() {
       <div class="sub mono">${esc(describeDest(d))}</div></div><i class="ph ph-caret-right" style="color: var(--faint)"></i></div>`).join("")
     : `<div class="empty"><i class="ph ph-hard-drives"></i>${esc(t("noDestinations"))}</div>`;
   $("#cred-list").innerHTML = settings.credentials.length ? settings.credentials.map((c) => `<div class="device clickable" data-edit-cred="${esc(c.id)}">
-      <div class="ico"><i class="ph ${c.kind === "oauth_google" ? "ph-google-logo" : c.kind === "access_key" ? "ph-key" : "ph-user"}"></i></div>
+      <div class="ico"><i class="ph ${c.kind === "oauth_google" ? "ph-google-logo" : c.kind === "access_key" ? "ph-key" : c.kind === "ssh_key" ? "ph-terminal-window" : "ph-user"}"></i></div>
       <div class="meta"><div class="name">${esc(credLabel(c))}</div><div class="sub mono">${esc(c.kind === "oauth_google" ? (c.refresh_token ? c.account || t("googleConnectedShort") : t("googleNotConnected")) : c.username || c.key_id || "")}</div></div>
       <i class="ph ph-caret-right" style="color: var(--faint)"></i></div>`).join("")
     : `<div class="empty"><i class="ph ph-key"></i>${esc(t("noCredentials"))}</div>`;
@@ -1314,6 +1339,8 @@ function openDeviceEditor(id) {
 // Destination types the editor offers, and the credential kind each one logs in with.
 const DEST_TYPES = [
   { type: "smb", icon: "ph-network", label: "networkShare", cred: "password" },
+  { type: "sftp", icon: "ph-terminal-window", label: "sftp", cred: ["password", "ssh_key"] },
+  { type: "ftp", icon: "ph-swap", label: "ftp", cred: "password" },
   { type: "local", icon: "ph-folder", label: "localFolder", cred: null },
   { type: "s3", icon: "ph-cloud", label: "objectStorage", cred: "access_key" },
   { type: "gdrive", icon: "ph-google-drive-logo", label: "googleDrive", cred: "oauth_google" },
@@ -1321,8 +1348,9 @@ const DEST_TYPES = [
 const destType = (type) => DEST_TYPES.find((x) => x.type === type) || DEST_TYPES[0];
 const credLabel = (c) => c.name || c.username || c.account || c.key_id || c.id;
 function credSelect(id, kind, value, allowNew) {
-  return `<select id="${id}" data-cred-kind="${kind}"><option value="">${esc(t(kind === "password" ? "credNone" : "credPick"))}</option>` +
-    settings.credentials.filter((c) => c.kind === kind).map((c) => `<option value="${esc(c.id)}" ${c.id === value ? "selected" : ""}>${esc(credLabel(c))}</option>`).join("") +
+  const kinds = [kind].flat();
+  return `<select id="${id}"><option value="">${esc(t(kinds[0] === "password" && kinds.length === 1 ? "credNone" : "credPick"))}</option>` +
+    settings.credentials.filter((c) => kinds.includes(c.kind)).map((c) => `<option value="${esc(c.id)}" ${c.id === value ? "selected" : ""}>${esc(credLabel(c))}</option>`).join("") +
     (allowNew ? `<option value="__new">${esc(t("credNew"))}</option>` : "") + `</select>`;
 }
 function openDestEditor(id) {
@@ -1331,7 +1359,7 @@ function openDestEditor(id) {
     : { id: "", name: "", type: "smb", host: "", share: "", base_path: "", path: "", endpoint: "", region: "", bucket: "", credentials: null };
   const typeSeg = DEST_TYPES.map((x) => `<input type="radio" name="dest-type" value="${x.type}" id="dt-${x.type}" ${x.type === d.type ? "checked" : ""}>
     <label for="dt-${x.type}"><i class="ph ${x.icon}"></i><span>${esc(t(x.label))}</span></label>`).join("");
-  const cred = (kind) => (d.type === destType(d.type).type && destType(d.type).cred === kind ? d.credentials : null);
+  const cred = (type) => (d.type === type ? d.credentials : null);
   openEditor({
     icon: "ph-hard-drives", title: existing ? existing.name || existing.id : t("newDestination"),
     body: `<div class="seg" style="margin-bottom: 16px; flex-wrap: wrap; display: inline-flex">${typeSeg}</div>
@@ -1343,7 +1371,7 @@ function openDestEditor(id) {
           <div class="with-btn"><input type="text" id="d-host" value="${esc(d.host)}" placeholder="nas.local">
             <button type="button" class="btn" data-discover><i class="ph ph-binoculars"></i>${esc(t("discover"))}</button></div>
           <div class="picker" id="d-hosts" hidden></div></div>
-        <div class="field full"><label for="d-cred-smb">${esc(t("credentials"))}</label>${credSelect("d-cred-smb", "password", cred("password"), true)}</div>
+        <div class="field full"><label for="d-cred-smb">${esc(t("credentials"))}</label>${credSelect("d-cred-smb", "password", cred("smb"), true)}</div>
         <div class="field" data-new-cred="smb" hidden><label for="d-user">${esc(t("username"))}</label><input type="text" id="d-user"></div>
         <div class="field" data-new-cred="smb" hidden><label for="d-pass">${esc(t("password"))}</label><input type="password" id="d-pass" autocomplete="new-password"></div>
         <div class="field full"><label for="d-share">${esc(t("share"))}</label>
@@ -1351,6 +1379,31 @@ function openDestEditor(id) {
             <button type="button" class="btn" data-browse><i class="ph ph-folders"></i>${esc(t("browse"))}</button></div>
           <div class="picker" id="d-shares" hidden></div></div>
         <div class="field full"><label for="d-base">${esc(t("subfolder"))}</label><input type="text" id="d-base" value="${esc(d.type === "smb" ? d.base_path : "")}" placeholder="${esc(t("optional"))}"></div>
+      </div>
+      <div class="fields" data-dest-for="sftp" style="margin-top: 16px">
+        <div class="field"><label for="d-sftp-host">${esc(t("server"))}</label><input type="text" id="d-sftp-host" value="${esc(d.type === "sftp" ? d.host : "")}" placeholder="nas.local"></div>
+        <div class="field"><label for="d-sftp-port">${esc(t("port"))}</label><input type="number" id="d-sftp-port" value="${esc(d.type === "sftp" && d.port ? d.port : "")}" placeholder="22"></div>
+        <div class="field full"><label for="d-cred-sftp">${esc(t("credentials"))}</label>${credSelect("d-cred-sftp", ["password", "ssh_key"], cred("sftp"), true)}
+          <div class="help">${esc(t("sftpCredHelp"))}</div></div>
+        <div class="field" data-new-cred="sftp" hidden><label for="d-sftp-user">${esc(t("username"))}</label><input type="text" id="d-sftp-user"></div>
+        <div class="field" data-new-cred="sftp" hidden><label for="d-sftp-pass">${esc(t("password"))}</label><input type="password" id="d-sftp-pass" autocomplete="new-password"></div>
+        <div class="field full"><label for="d-sftp-path">${esc(t("remoteFolder"))}</label><input type="text" id="d-sftp-path" class="mono" value="${esc(d.type === "sftp" ? d.base_path : "")}" placeholder="/volume1/photo">
+          <div class="help">${esc(t("remoteFolderHelp"))}</div></div>
+        ${d.type === "sftp" && d.fingerprint ? `<div class="field full"><label>${esc(t("pinnedKey"))}</label><div class="with-btn"><input type="text" class="mono" id="d-sftp-fp" value="${esc(d.fingerprint)}" readonly>
+          <button type="button" class="btn" data-clear-pin="d-sftp-fp">${esc(t("clearPin"))}</button></div></div>` : ""}
+      </div>
+      <div class="fields" data-dest-for="ftp" style="margin-top: 16px">
+        <div class="field full"><label>${esc(t("ftpSecurity"))}</label><div class="seg" style="display: inline-flex">
+          ${["explicit", "implicit", "none"].map((m) => `<input type="radio" name="ftp-tls" value="${m}" id="ft-${m}" ${(d.type === "ftp" ? d.ftp_tls : "explicit") === m ? "checked" : ""}><label for="ft-${m}">${esc(t(`ftp_${m}`))}</label>`).join("")}
+        </div><div class="help">${esc(t("ftpSecurityHelp"))}</div></div>
+        <div class="field"><label for="d-ftp-host">${esc(t("server"))}</label><input type="text" id="d-ftp-host" value="${esc(d.type === "ftp" ? d.host : "")}" placeholder="nas.local"></div>
+        <div class="field"><label for="d-ftp-port">${esc(t("port"))}</label><input type="number" id="d-ftp-port" value="${esc(d.type === "ftp" && d.port ? d.port : "")}" placeholder="21 / 990"></div>
+        <div class="field full"><label for="d-cred-ftp">${esc(t("credentials"))}</label>${credSelect("d-cred-ftp", "password", cred("ftp"), true)}</div>
+        <div class="field" data-new-cred="ftp" hidden><label for="d-ftp-user">${esc(t("username"))}</label><input type="text" id="d-ftp-user"></div>
+        <div class="field" data-new-cred="ftp" hidden><label for="d-ftp-pass">${esc(t("password"))}</label><input type="password" id="d-ftp-pass" autocomplete="new-password"></div>
+        <div class="field full"><label for="d-ftp-path">${esc(t("remoteFolder"))}</label><input type="text" id="d-ftp-path" class="mono" value="${esc(d.type === "ftp" ? d.base_path : "")}" placeholder="/photo/Ferry"></div>
+        ${d.type === "ftp" && d.fingerprint ? `<div class="field full"><label>${esc(t("pinnedCert"))}</label><div class="with-btn"><input type="text" class="mono" id="d-ftp-fp" value="${esc(d.fingerprint)}" readonly>
+          <button type="button" class="btn" data-clear-pin="d-ftp-fp">${esc(t("clearPin"))}</button></div></div>` : ""}
       </div>
       <div class="fields" data-dest-for="local" style="margin-top: 16px">
         <div class="field full"><label for="d-path">${esc(t("path"))}</label><input type="text" id="d-path" value="${esc(d.path)}" placeholder="/data/library">
@@ -1362,12 +1415,12 @@ function openDestEditor(id) {
         <div class="field"><label for="d-bucket">${esc(t("bucket"))}</label><input type="text" id="d-bucket" class="mono" value="${esc(d.bucket)}"></div>
         <div class="field"><label for="d-region">${esc(t("region"))}</label><input type="text" id="d-region" class="mono" value="${esc(d.region)}" placeholder="auto"></div>
         <div class="field full"><label for="d-prefix">${esc(t("prefix"))}</label><input type="text" id="d-prefix" class="mono" value="${esc(d.type === "s3" ? d.base_path : "")}" placeholder="${esc(t("optional"))}"></div>
-        <div class="field full"><label for="d-cred-s3">${esc(t("accessKey"))}</label>${credSelect("d-cred-s3", "access_key", cred("access_key"), true)}</div>
+        <div class="field full"><label for="d-cred-s3">${esc(t("accessKey"))}</label>${credSelect("d-cred-s3", "access_key", cred("s3"), true)}</div>
         <div class="field" data-new-cred="s3" hidden><label for="d-keyid">${esc(t("keyId"))}</label><input type="text" id="d-keyid" class="mono"></div>
         <div class="field" data-new-cred="s3" hidden><label for="d-secret">${esc(t("secretKey"))}</label><input type="password" id="d-secret" class="mono" autocomplete="new-password"></div>
       </div>
       <div class="fields" data-dest-for="gdrive" style="margin-top: 16px">
-        <div class="field full"><label for="d-cred-gdrive">${esc(t("googleAccount"))}</label>${credSelect("d-cred-gdrive", "oauth_google", cred("oauth_google"), false)}
+        <div class="field full"><label for="d-cred-gdrive">${esc(t("googleAccount"))}</label>${credSelect("d-cred-gdrive", "oauth_google", cred("gdrive"), false)}
           <div class="help">${esc(t("googleAccountHelp"))}</div></div>
         <div class="field full"><label for="d-root">${esc(t("driveFolder"))}</label><input type="text" id="d-root" value="${esc(d.type === "gdrive" ? d.base_path || "Ferry" : "Ferry")}">
           <div class="help">${esc(t("driveFolderHelp"))}</div></div>
@@ -1392,23 +1445,33 @@ function openDestEditor(id) {
         toast(t("deleted")); return;
       }
       const type = $("input[name=dest-type]:checked").value;
-      const host = $("#d-host").value.trim(), endpoint = $("#d-endpoint").value.trim(), bucket = $("#d-bucket").value.trim();
+      const host = ({ sftp: $("#d-sftp-host"), ftp: $("#d-ftp-host") }[type] || $("#d-host")).value.trim(), endpoint = $("#d-endpoint").value.trim(), bucket = $("#d-bucket").value.trim();
       const taken = settings.credentials.map((c) => c.id);
       let credId = type === "local" ? null : $(`#d-cred-${type}`).value || null, newCred = null;
       if (credId === "__new" && type === "smb") {
         const user = $("#d-user").value.trim();
         credId = slug(`${user}-${host}`, taken);
         newCred = { id: credId, name: `${user}@${host}`, kind: "password", username: user, password: $("#d-pass").value };
+      } else if (credId === "__new" && (type === "sftp" || type === "ftp")) {
+        const user = $(`#d-${type}-user`).value.trim();
+        credId = slug(`${user}-${host}`, taken);
+        newCred = { id: credId, name: `${user}@${host}`, kind: "password", username: user, password: $(`#d-${type}-pass`).value };
       } else if (credId === "__new" && type === "s3") {
         const keyId = $("#d-keyid").value.trim();
         credId = slug(`${bucket || "s3"}-key`, taken);
         newCred = { id: credId, name: `${bucket || "S3"} key`, kind: "access_key", key_id: keyId, secret: $("#d-secret").value };
       }
-      const base = { smb: $("#d-base").value.trim(), s3: $("#d-prefix").value.trim(), gdrive: $("#d-root").value.trim() || "Ferry" }[type] ?? "";
-      const fallbackName = { smb: host, local: $("#d-path").value.trim(), s3: bucket, gdrive: "Google Drive" }[type];
+      const base = { smb: $("#d-base").value.trim(), s3: $("#d-prefix").value.trim(), gdrive: $("#d-root").value.trim() || "Ferry",
+        sftp: $("#d-sftp-path").value.trim(), ftp: $("#d-ftp-path").value.trim() }[type] ?? "";
+      const fallbackName = { smb: host, sftp: host, ftp: host, local: $("#d-path").value.trim(), s3: bucket, gdrive: "Google Drive" }[type];
+      const port = Number(({ sftp: $("#d-sftp-port"), ftp: $("#d-ftp-port") }[type] || { value: 0 }).value) || 0;
+      const pinField = { sftp: $("#d-sftp-fp"), ftp: $("#d-ftp-fp") }[type];
       const destId = existing ? existing.id : slug($("#d-name").value || fallbackName || type, settings.destinations.map((x) => x.id));
       const next = { ...d, id: destId, type, name: $("#d-name").value.trim() || fallbackName, host, share: $("#d-share").value.trim(),
-        base_path: base, path: $("#d-path").value.trim(), endpoint, bucket, region: $("#d-region").value.trim(), credentials: credId };
+        base_path: base, path: $("#d-path").value.trim(), endpoint, bucket, region: $("#d-region").value.trim(), credentials: credId,
+        port, ftp_tls: $("input[name=ftp-tls]:checked")?.value || "explicit",
+        // A changed server or protocol starts a new pin; "Clear" forgets the old one on purpose.
+        fingerprint: pinField?.dataset.cleared ? "__clear__" : "" };
       await saveSettings((s) => {
         if (newCred) s.credentials.push(newCred);
         s.destinations = existing ? s.destinations.map((x) => (x.id === destId ? next : x)) : [...s.destinations, next];
@@ -1417,6 +1480,7 @@ function openDestEditor(id) {
       if (action === "test") {
         const r = await post(`/api/destinations/${encodeURIComponent(destId)}/test`);
         toast(t("testOk", { target: r.target }));
+        settings = await api("/api/settings"); renderSettings();  // picks up a key pinned by the test
         openDestEditor(destId);
         return false;
       }
@@ -1427,12 +1491,13 @@ function openDestEditor(id) {
 
 const CRED_KINDS = [
   { kind: "password", icon: "ph-user", label: "credPassword" },
+  { kind: "ssh_key", icon: "ph-terminal-window", label: "credSshKey" },
   { kind: "access_key", icon: "ph-key", label: "credAccessKey" },
   { kind: "oauth_google", icon: "ph-google-logo", label: "credGoogle" },
 ];
 function openCredEditor(id, kindHint) {
   const c = id ? structuredClone(credById(id))
-    : { id: "", name: "", kind: kindHint || "password", username: "", password: "", key_id: "", secret: "", client_id: "", client_secret: "", account: "", refresh_token: "" };
+    : { id: "", name: "", kind: kindHint || "password", username: "", password: "", private_key: "", key_id: "", secret: "", client_id: "", client_secret: "", account: "", refresh_token: "" };
   const seg = CRED_KINDS.map((x) => `<input type="radio" name="cred-kind" value="${x.kind}" id="ck-${x.kind}" ${x.kind === c.kind ? "checked" : ""} ${id ? "disabled" : ""}>
     <label for="ck-${x.kind}"><i class="ph ${x.icon}"></i><span>${esc(t(x.label))}</span></label>`).join("");
   const connected = c.kind === "oauth_google" && c.refresh_token;
@@ -1443,6 +1508,13 @@ function openCredEditor(id, kindHint) {
       <div class="fields" data-cred-for="password" style="margin-top: 16px">
         <div class="field"><label for="c-user">${esc(t("username"))}</label><input type="text" id="c-user" value="${esc(c.username)}"></div>
         <div class="field"><label for="c-pass">${esc(t("password"))}</label><input type="password" id="c-pass" value="${esc(c.password)}" autocomplete="new-password"></div>
+      </div>
+      <div class="fields" data-cred-for="ssh_key" style="margin-top: 16px">
+        <div class="field full"><label for="c-ssh-user">${esc(t("username"))}</label><input type="text" id="c-ssh-user" value="${esc(c.username)}"></div>
+        <div class="field full"><label for="c-ssh-key">${esc(t("privateKey"))}</label>
+          <textarea id="c-ssh-key" class="mono" rows="6" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----">${esc(c.private_key)}</textarea>
+          <div class="help">${esc(t("privateKeyHelp"))}</div></div>
+        <div class="field full"><label for="c-ssh-pass">${esc(t("passphrase"))}</label><input type="password" id="c-ssh-pass" value="${esc(c.kind === "ssh_key" ? c.password : "")}" placeholder="${esc(t("optional"))}" autocomplete="new-password"></div>
       </div>
       <div class="fields" data-cred-for="access_key" style="margin-top: 16px">
         <div class="field"><label for="c-keyid">${esc(t("keyId"))}</label><input type="text" id="c-keyid" class="mono" value="${esc(c.key_id)}"></div>
@@ -1473,10 +1545,11 @@ function openCredEditor(id, kindHint) {
     onSave: async (action) => {
       if (action === "delete") { await saveSettings((s) => { s.credentials = s.credentials.filter((x) => x.id !== id); }); toast(t("deleted")); return; }
       const kind = $("input[name=cred-kind]:checked").value;
-      const user = $("#c-user").value.trim(), keyId = $("#c-keyid").value.trim();
+      const user = (kind === "ssh_key" ? $("#c-ssh-user") : $("#c-user")).value.trim(), keyId = $("#c-keyid").value.trim();
       const credId = id || slug($("#c-name").value || user || keyId || kind, settings.credentials.map((x) => x.id));
       const next = { ...c, id: credId, kind, name: $("#c-name").value.trim() || user || keyId || t(CRED_KINDS.find((x) => x.kind === kind).label),
-        username: user, password: $("#c-pass").value, key_id: keyId, secret: $("#c-secret").value,
+        username: user, password: kind === "ssh_key" ? $("#c-ssh-pass").value : $("#c-pass").value,
+        private_key: kind === "ssh_key" ? $("#c-ssh-key").value : "", key_id: keyId, secret: $("#c-secret").value,
         client_id: $("#c-client").value.trim(), client_secret: $("#c-client-secret").value };
       await saveSettings((s) => { s.credentials = id ? s.credentials.map((x) => (x.id === id ? next : x)) : [...s.credentials, next]; });
       if (action === "connect") { await connectGoogle(credId); return false; }
@@ -1651,13 +1724,14 @@ async function scanBle() {
   ui.scanning = false; renderStatus(status);
 }
 document.addEventListener("click", async (e) => {
-  const el = e.target.closest("[data-add-printer],[data-find-printers],[data-printer],[data-adopt],[data-pair],[data-sync],[data-cancel],[data-host],[data-share],[data-close],[data-scan],[data-discover],[data-browse],[data-edit-dest],[data-edit-cred],[data-edit-provider],[data-edit-device]");
+  const el = e.target.closest("[data-clear-pin],[data-add-printer],[data-find-printers],[data-printer],[data-adopt],[data-pair],[data-sync],[data-cancel],[data-host],[data-share],[data-close],[data-scan],[data-discover],[data-browse],[data-edit-dest],[data-edit-cred],[data-edit-provider],[data-edit-device]");
   if (!el) return;
   const d = el.dataset;
   if (d.close) { $(`#${d.close}`).hidden = true; return; }
   if (d.host) { $("#d-host").value = d.host; $("#d-hosts").hidden = true; $("#d-cred-smb").focus(); return; }
   if (d.share) { $("#d-share").value = d.share; $("#d-shares").hidden = true; return; }
   if ("scan" in d) { scanBle(); return; }
+  if (d.clearPin) { const f = $(`#${d.clearPin}`); f.value = ""; f.dataset.cleared = "1"; return; }
   if ("addPrinter" in d) { openPrinterEditor(); return; }
   if ("findPrinters" in d) { findPrinters(el); return; }
   if (d.printer) {

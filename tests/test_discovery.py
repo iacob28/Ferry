@@ -7,8 +7,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from gopro_sync import discovery
-from gopro_sync.discovery import (
+from ferry import discovery
+from ferry.discovery import (
     DiscoveryError,
     NetworkHost,
     _merge,

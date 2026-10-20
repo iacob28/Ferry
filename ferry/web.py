@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from contextlib import asynccontextmanager
+from contextlib import aclosing, asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Response
@@ -14,14 +14,13 @@ from pydantic import BaseModel
 
 from . import __version__
 from .auth import COOKIE, SESSION_TTL, AuthStore
-from .config import Settings
-from .service import SyncService
-from .engine import thumb_name
-from .targets import TargetError, make_target
+from .core.engine import thumb_name
+from .core.service import SyncService
+from .core.settings import Settings
+from .destinations import DestinationError, make_destination
 
 STATIC = Path(__file__).parent / "static"
 MASK = "********"
-STREAM_CHUNK = 1 << 20
 MEDIA_TYPES = {"mp4": "video/mp4", "mov": "video/quicktime", "jpg": "image/jpeg", "jpeg": "image/jpeg",
                "gpr": "application/octet-stream", "wav": "audio/wav"}
 # Reachable without a session: the page shell and the sign-in/setup endpoints.
@@ -90,7 +89,7 @@ def create_app(service: SyncService, auth: AuthStore) -> FastAPI:
         yield
         await service.stop()
 
-    app = FastAPI(title="GoPro Sync", version=__version__, lifespan=lifespan, docs_url=None, redoc_url=None)
+    app = FastAPI(title="Ferry", version=__version__, lifespan=lifespan, docs_url=None, redoc_url=None)
 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
@@ -183,7 +182,7 @@ def create_app(service: SyncService, auth: AuthStore) -> FastAPI:
     @app.post("/api/target/test")
     async def test_target():
         try:
-            target = make_target(service.settings)
+            target = make_destination(service.settings)
             await target.test()
         except Exception as exc:
             raise HTTPException(400, f"{type(exc).__name__}: {exc}")
@@ -213,17 +212,20 @@ def create_app(service: SyncService, auth: AuthStore) -> FastAPI:
 
     # --- cameras ---------------------------------------------------------
 
+    def gopro():
+        return service.provider("gopro")
+
     @app.get("/api/ble/scan")
     async def ble_scan():
         try:
-            return await service.scan_ble()
+            return await gopro().scan_ble()
         except Exception as exc:
             raise HTTPException(409, str(exc))
 
     @app.post("/api/ble/pair")
     async def ble_pair(req: PairRequest):
         try:
-            await service.pair(req.address, req.name)
+            await gopro().pair(req.address, req.name)
         except Exception as exc:
             service.log("error", f"pairing failed: {exc}")
             raise HTTPException(400, f"pairing failed: {exc}")
@@ -231,7 +233,7 @@ def create_app(service: SyncService, auth: AuthStore) -> FastAPI:
 
     @app.delete("/api/ble/cameras/{address}")
     async def ble_forget(address: str):
-        service.forget(address)
+        gopro().forget(address)
         return {"ok": True}
 
     @app.post("/api/sync")
@@ -269,15 +271,16 @@ def create_app(service: SyncService, auth: AuthStore) -> FastAPI:
     async def library_media(item_id: int, request: Request, download: bool = False):
         item = _item(item_id)
         try:
-            target = make_target(service.settings)
-            fh = await asyncio.to_thread(target.open_read, item["dest"])
-        except (TargetError, OSError) as exc:
+            destination = make_destination(service.settings)
+            remote = await destination.stat(item["dest"])
+        except (DestinationError, OSError) as exc:
             raise HTTPException(502, f"cannot open {item['dest']} on the destination: {exc}") from exc
-        size = item["size"] if item["size"] >= 0 else await asyncio.to_thread(lambda: fh.seek(0, 2))
+        if remote is None:
+            raise HTTPException(502, f"{item['dest']} is no longer on the destination")
+        size = remote.size
         try:
             span = _byte_range(request.headers.get("range"), size)
         except (HTTPException, ValueError):
-            fh.close()
             raise HTTPException(416, "range not satisfiable", headers={"Content-Range": f"bytes */{size}"})
         start, end = span or (0, size - 1)
         name = item["path"].rsplit("/", 1)[-1]
@@ -287,17 +290,11 @@ def create_app(service: SyncService, auth: AuthStore) -> FastAPI:
             headers["Content-Range"] = f"bytes {start}-{end}/{size}"
 
         async def body():
-            try:
-                await asyncio.to_thread(fh.seek, start)
-                left = end - start + 1
-                while left > 0 and not await request.is_disconnected():
-                    chunk = await asyncio.to_thread(fh.read, min(STREAM_CHUNK, left))
-                    if not chunk:
+            async with aclosing(destination.open_range(item["dest"], start, end)) as chunks:
+                async for chunk in chunks:
+                    if await request.is_disconnected():
                         break
-                    left -= len(chunk)
                     yield chunk
-            finally:
-                await asyncio.to_thread(fh.close)
 
         media_type = MEDIA_TYPES.get(name.rsplit(".", 1)[-1].lower(), "application/octet-stream")
         return StreamingResponse(body(), status_code=206 if span else 200, media_type=media_type, headers=headers)

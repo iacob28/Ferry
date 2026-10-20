@@ -270,7 +270,7 @@ def _smb_auth_file(username: str, password: str) -> str:
     lines = [f"username={username}", f"password={password}"]
     if domain:
         lines.append(f"domain={domain}")
-    fd, path = tempfile.mkstemp(prefix="gopro-sync-smb-")
+    fd, path = tempfile.mkstemp(prefix="ferry-smb-")
     try:
         os.fchmod(fd, 0o600)
         os.write(fd, ("\n".join(lines) + "\n").encode())

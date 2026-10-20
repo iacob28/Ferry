@@ -8,7 +8,7 @@ import signal
 import sys
 from pathlib import Path
 
-from . import netutil
+from ... import netutil
 
 
 class WifiError(Exception):

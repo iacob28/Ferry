@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GoPro Sync</title>
+<title>Ferry</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%230a84d6'/%3E%3Crect x='7' y='10' width='13' height='12' rx='3' fill='white'/%3E%3Cpath d='M21 14l5-3v10l-5-3z' fill='white'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/static/vendor/geist/geist.css">
 <link rel="stylesheet" href="/static/vendor/phosphor/light.css">
@@ -346,7 +346,7 @@
 
 <div id="auth" class="auth" hidden>
   <div class="panel"><form id="auth-form" class="core auth-card">
-    <div class="brand"><div class="brand-mark"><i class="ph-fill ph-video-camera"></i></div>GoPro Sync</div>
+    <div class="brand"><div class="brand-mark"><i class="ph-fill ph-video-camera"></i></div>Ferry</div>
     <span class="eyebrow"><i class="ph ph-shield-check" style="font-size: 13px"></i><span data-i18n="secureArea">Admin</span></span>
     <h1 id="auth-title"></h1>
     <p id="auth-sub"></p>
@@ -361,7 +361,7 @@
 <div id="app" hidden>
 <header class="topbar">
   <div class="topbar-inner">
-    <div class="brand"><div class="brand-mark"><i class="ph-fill ph-video-camera"></i></div><span class="brand-name">GoPro Sync</span></div>
+    <div class="brand"><div class="brand-mark"><i class="ph-fill ph-video-camera"></i></div><span class="brand-name">Ferry</span></div>
     <div class="spacer"></div>
     <div class="target-hint" data-i18n-title="destination"><i class="ph ph-hard-drives"></i><span id="target-hint"></span></div>
     <div class="seg lang" role="group" aria-label="Language"><button type="button" data-lang="en">EN</button><button type="button" data-lang="ro">RO</button></div>
@@ -519,7 +519,7 @@
       </div></section>
     </div>
   </div>
-  <p class="small muted" style="text-align: center; margin: 0">GoPro Sync <span id="version"></span></p>
+  <p class="small muted" style="text-align: center; margin: 0">Ferry <span id="version"></span></p>
 </main>
 </div>
 <dialog id="viewer" aria-labelledby="v-name">
@@ -557,7 +557,7 @@ const I18N = {
     parallel: "Parallel syncs", parallelD: "USB and wireless together.", cooldown: "Wireless pause", minutes: "Minutes between wireless syncs of the same camera.",
     security: "Security", currentPassword: "Current password", newPassword: "New password", changePassword: "Change password",
     confirmPassword: "Confirm password", signOut: "Sign out", passwordChanged: "Password changed",
-    setupTitle: "Welcome", setupSub: "Create the admin password for this GoPro Sync server.", setupBtn: "Create password",
+    setupTitle: "Welcome", setupSub: "Create the admin password for this Ferry server.", setupBtn: "Create password",
     loginTitle: "Sign in", loginSub: "Enter the admin password.", loginBtn: "Sign in", mismatch: "The passwords don't match.",
     state_idle: "Idle", state_syncing: "Syncing", state_pairing: "Pairing", s_connecting: "Connecting", s_syncing: "Transferring",
     loading: "Loading…", idleTitle: "Everything is up to date", idlePaired: "Switch a camera on nearby or plug it in, and the sync starts by itself.",
@@ -599,7 +599,7 @@ const I18N = {
     parallel: "Sincronizări în paralel", parallelD: "USB și wireless împreună.", cooldown: "Pauză wireless", minutes: "Minute între două sincronizări wireless ale aceleiași camere.",
     security: "Securitate", currentPassword: "Parola curentă", newPassword: "Parola nouă", changePassword: "Schimbă parola",
     confirmPassword: "Confirmă parola", signOut: "Deconectare", passwordChanged: "Parola a fost schimbată",
-    setupTitle: "Bun venit", setupSub: "Creează parola de administrator pentru acest server GoPro Sync.", setupBtn: "Creează parola",
+    setupTitle: "Bun venit", setupSub: "Creează parola de administrator pentru acest server Ferry.", setupBtn: "Creează parola",
     loginTitle: "Autentificare", loginSub: "Introdu parola de administrator.", loginBtn: "Intră", mismatch: "Parolele nu coincid.",
     state_idle: "Inactiv", state_syncing: "Sincronizare", state_pairing: "Asociere", s_connecting: "Conectare", s_syncing: "Transfer",
     loading: "Se încarcă…", idleTitle: "Totul e la zi", idlePaired: "Pornește o cameră în apropiere sau conecteaz-o prin cablu și sincronizarea începe singură.",
@@ -626,7 +626,7 @@ const I18N = {
 };
 const LOCALES = { en: "en-GB", ro: "ro-RO" };
 let lang = "en";
-try { const saved = localStorage.getItem("gopro-sync.lang"); if (I18N[saved]) lang = saved; } catch {}
+try { const saved = localStorage.getItem("ferry.lang") ?? localStorage.getItem("gopro-sync.lang"); if (I18N[saved]) lang = saved; } catch {}
 const t = (key, vars = {}) => (I18N[lang][key] ?? I18N.en[key] ?? key).replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m));
 
 const $ = (s) => document.querySelector(s);
@@ -947,7 +947,7 @@ function connectEvents() {
 /* ---------- actions ---------- */
 document.querySelectorAll("[data-lang]").forEach((b) => b.addEventListener("click", () => {
   lang = b.dataset.lang;
-  try { localStorage.setItem("gopro-sync.lang", lang); } catch {}
+  try { localStorage.setItem("ferry.lang", lang); } catch {}
   applyLanguage();
 }));
 $("#settings").addEventListener("change", (e) => { if (e.target.name === "target") toggleTarget(); });

@@ -9,17 +9,17 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY pyproject.toml README.md ./
-COPY gopro_sync ./gopro_sync
+COPY ferry ./ferry
 RUN pip install --no-cache-dir .
 
-LABEL org.opencontainers.image.title="GoPro Sync" \
-      org.opencontainers.image.description="Offload GoPro cameras to network storage over USB or Bluetooth + Wi-Fi"
+LABEL org.opencontainers.image.title="Ferry" \
+      org.opencontainers.image.description="Offload cameras, drones and 3D printers to network storage"
 
-ENV GOPRO_SYNC_DATA=/data \
-    GOPRO_SYNC_PORT=8780 \
+ENV FERRY_DATA=/data \
+    FERRY_PORT=8780 \
     PYTHONUNBUFFERED=1
 VOLUME /data
 EXPOSE 8780
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
-    CMD python -c "import os, urllib.request; urllib.request.urlopen(f'http://127.0.0.1:{os.environ[\"GOPRO_SYNC_PORT\"]}/healthz', timeout=4)"
-CMD ["python", "-m", "gopro_sync"]
+    CMD python -c "import os, urllib.request; urllib.request.urlopen(f'http://127.0.0.1:{os.environ[\"FERRY_PORT\"]}/healthz', timeout=4)"
+CMD ["python", "-m", "ferry"]

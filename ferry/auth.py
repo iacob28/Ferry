@@ -12,7 +12,9 @@ import threading
 import time
 from pathlib import Path
 
-COOKIE = "gopro_sync_session"
+from .core.settings import env
+
+COOKIE = "ferry_session"
 SESSION_TTL = 30 * 24 * 3600
 MIN_PASSWORD = 8
 
@@ -47,7 +49,7 @@ class AuthStore:
         if "secret" not in data:
             data["secret"] = _b64(secrets.token_bytes(32))
             self._write(data)
-        seed = os.environ.get("GOPRO_SYNC_PASSWORD")
+        seed = env("PASSWORD")
         if seed and not data.get("password"):
             self.set_password(seed)
 

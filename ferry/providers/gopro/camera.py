@@ -5,37 +5,24 @@ from __future__ import annotations
 import asyncio
 import socket
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 from urllib.parse import quote
 
 import httpx
 
+from ...core.media import MediaItem, SourceError
+
 WIFI_AP_HOST = "10.5.5.9"
 HTTP_PORT = 8080
 
 
-class CameraError(Exception):
+class CameraError(SourceError):
     pass
 
 
-@dataclass(frozen=True)
-class MediaFile:
-    directory: str
-    name: str
-    # Camera wall-clock time encoded as an epoch (the camera has no timezone).
-    created: int
-    # None for files inside a photo group, whose size is only known on download.
-    size: int | None
-
-    @property
-    def path(self) -> str:
-        return f"{self.directory}/{self.name}"
-
-
-def parse_media_list(data: dict) -> list[MediaFile]:
-    files: list[MediaFile] = []
+def parse_media_list(data: dict) -> list[MediaItem]:
+    files: list[MediaItem] = []
     for folder in data.get("media", []):
         directory = folder["d"]
         for item in folder.get("fs", []):
@@ -47,10 +34,12 @@ def parse_media_list(data: dict) -> list[MediaFile]:
                 prefix, ext = name[:4], name.rsplit(".", 1)[-1]
                 for idx in range(int(item["b"]), int(item["l"]) + 1):
                     if idx not in missing:
-                        files.append(MediaFile(directory, f"{prefix}{idx:04d}.{ext}", created, None))
+                        member = f"{prefix}{idx:04d}.{ext}"
+                        # Members of a photo group only get a size on download.
+                        files.append(MediaItem(f"{directory}/{member}", member, created, None))
             else:
                 size = int(item["s"]) if "s" in item else None
-                files.append(MediaFile(directory, name, created, size))
+                files.append(MediaItem(f"{directory}/{name}", name, created, size))
     return files
 
 
@@ -107,7 +96,7 @@ class GoProHttp:
         except CameraError:
             return {}
 
-    async def media_list(self) -> list[MediaFile]:
+    async def list_media(self) -> list[MediaItem]:
         return parse_media_list(await self._get_json("/gopro/media/list"))
 
     async def battery_percent(self) -> int | None:
@@ -127,7 +116,8 @@ class GoProHttp:
     async def set_wired_control(self, enabled: bool) -> None:
         await self._get("/gopro/camera/control/wired_usb", p=1 if enabled else 0)
 
-    async def delete(self, path: str) -> None:
+    async def delete(self, item: MediaItem) -> None:
+        path = item.path
         resp = await self._get(_with_path("/gopro/media/delete/file", path))
         if resp.status_code == 404:
             # Older firmware only has the legacy endpoint.
@@ -135,7 +125,8 @@ class GoProHttp:
         if resp.status_code != 200:
             raise CameraError(f"deleting {path} returned HTTP {resp.status_code}")
 
-    async def thumbnail(self, path: str) -> bytes:
+    async def thumbnail(self, item: MediaItem) -> bytes:
+        path = item.path
         resp = await self._get(_with_path("/gopro/media/thumbnail", path))
         if resp.status_code != 200 or not resp.content:
             raise CameraError(f"thumbnail {path}: HTTP {resp.status_code}")
@@ -147,11 +138,8 @@ class GoProHttp:
         except CameraError:
             pass
 
-    async def download(self, media: MediaFile, dest: Path, on_bytes: Callable[[int], None]) -> int:
-        """Download into dest, resuming from its current size. Returns the expected total size.
-
-        on_bytes receives only newly transferred bytes (negative if a resume is discarded).
-        """
+    async def download(self, media: MediaItem, dest: Path, on_bytes: Callable[[int], None]) -> int:
+        """See MediaSource.download; resumes with an HTTP Range request."""
         offset = dest.stat().st_size if dest.exists() else 0
         if media.size is not None and offset > media.size:
             dest.unlink()

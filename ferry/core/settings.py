@@ -11,8 +11,15 @@ from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 
 
+def env(name: str, default: str | None = None) -> str | None:
+    """FERRY_<name>, falling back to the GOPRO_SYNC_<name> variables of earlier releases."""
+    return os.environ.get(f"FERRY_{name}") or os.environ.get(f"GOPRO_SYNC_{name}") or default
+
+
 def data_dir() -> Path:
-    path = Path(os.environ.get("GOPRO_SYNC_DATA", Path.home() / ".gopro-sync"))
+    legacy = Path.home() / ".gopro-sync"
+    default = legacy if legacy.exists() and not (Path.home() / ".ferry").exists() else Path.home() / ".ferry"
+    path = Path(env("DATA") or default)
     path.mkdir(parents=True, exist_ok=True)
     return path
 

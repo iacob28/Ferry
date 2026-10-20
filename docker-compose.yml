@@ -9,6 +9,11 @@ services:
     cap_add:
       - NET_ADMIN
       - NET_RAW
+      # Mount drones and cameras that connect as USB storage (read-only unless deleting).
+      - SYS_ADMIN
+    # USB disks only (sd*, block major 8); the Pi's own SD card (mmcblk) stays out of reach.
+    device_cgroup_rules:
+      - "b 8:* rmw"
     # Docker's default AppArmor profile blocks D-Bus calls to bluetoothd.
     security_opt:
       - apparmor:unconfined
@@ -21,3 +26,5 @@ services:
       - ${FERRY_DATA:-./data}:/data
       # Bluetooth through the host's bluetoothd.
       - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
+      # Device nodes for USB drives plugged in after start.
+      - /dev:/dev

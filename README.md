@@ -5,9 +5,14 @@ Plug a device in, or simply switch it on near the server, and every new photo an
 copied to your NAS. The app verifies each file on the destination and can then free up the
 device's storage.
 
-Supported today: **GoPro** cameras. In progress: DJI drones and other cameras over USB
-(mass storage), Bambu Lab printer timelapses, and cloud destinations (S3 / Cloudflare R2,
-Google Drive). Ferry was called GoPro Sync until 0.2.0.
+Supported sources:
+
+- **GoPro** cameras over USB or Bluetooth + Wi-Fi.
+- **Drones and cameras that connect as USB storage**: DJI (Neo and others), Insta360, any
+  camera with a `DCIM` folder, and SD card readers.
+
+In progress: Bambu Lab printer timelapses and cloud destinations (S3 / Cloudflare R2, Google
+Drive). Ferry was called GoPro Sync until 0.2.0.
 
 - **USB**: the camera shows up as a USB network device; any number of cameras in parallel.
 - **Wireless**: the server notices a paired camera over Bluetooth, turns on its Wi-Fi,
@@ -76,6 +81,25 @@ click **Find cameras** in the UI and **Pair**. From then on, switching the camer
 the server starts a sync. After a successful sync the camera is put to standby and is not
 synced again for the configured pause.
 
+### Drones and cameras over USB (DJI, Insta360, card readers)
+
+Connect the device with its USB cable (the DJI Neo over USB-C) and switch it on if it needs
+to be. Ferry mounts it **read-only**, looks for a `DCIM` folder and shows it under Devices.
+The first time, choose **Adopt** (set its folder and rules, then press Sync) or **Adopt and
+sync**. From then on it syncs whenever it is plugged in, and is unmounted when done, so it can
+be unplugged safely. Drives without `DCIM`, and file systems other than FAT/exFAT/NTFS, are
+never touched.
+
+The container needs `SYS_ADMIN`, the `b 8:* rmw` device rule and `/dev` (all in
+`docker-compose.yml`). If you would rather not grant that, let the host automount drives (for
+example under `/media`), bind-mount that folder into the container and add it as a *watch
+folder* in the provider settings.
+
+Capture dates come from the file name where the camera encodes it (`DJI_20261020143012_...`,
+`VID_20261020_143012_...`), otherwise from the file time; set `TZ` to the camera's time zone.
+Low-resolution proxies (`.LRF`, `.LRV`) and thumbnails stay on the device; the list of file
+types is configurable.
+
 ### Deleting from the card
 
 Off by default. When enabled, files are deleted from the camera only after every file of
@@ -119,7 +143,7 @@ share one destination.
 ## Development
 
 ```bash
-uv venv && uv pip install -e ".[dev]"
+uv venv && uv pip install -e ".[dev,media]"
 .venv/bin/pytest
 FERRY_DATA=./.dev-data .venv/bin/python -m ferry   # http://localhost:8780
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build

@@ -614,6 +614,13 @@ const I18N = {
     opt_gopro_ble: "Automatic wireless sync", opt_gopro_ble_d: "Starts when a paired camera is switched on nearby.",
     opt_gopro_sleep_after_sync: "Standby when done", opt_gopro_sleep_after_sync_d: "Puts the camera to sleep after a wireless sync.",
     opt_gopro_cooldown_minutes: "Wireless pause", opt_gopro_cooldown_minutes_d: "Minutes between wireless syncs of the same camera.",
+    provider_usbstorage: "USB drones & cameras", adopt: "Adopt", adoptSync: "Adopt and sync", newDrive: "New",
+    noDrives: "Nothing plugged in. Connect a drone or camera with its USB cable (DJI Neo: USB-C), or an SD card reader.",
+    knownDrives: "Known drives", vol_checking: "Checking", vol_ready: "Connected", vol_done: "Synced, safe to unplug", vol_error: "Error",
+    opt_usbstorage_auto: "Sync when plugged in", opt_usbstorage_auto_d: "Adopted drives start syncing as soon as they are connected.",
+    opt_usbstorage_auto_adopt: "Adopt new drives automatically", opt_usbstorage_auto_adopt_d: "Otherwise a new drive waits until you adopt it here.",
+    opt_usbstorage_watch_folders: "Watch folders", opt_usbstorage_watch_folders_d: "Folders where the host already mounts drives, for example /media. Each sub-folder with a DCIM folder counts as a drive.",
+    opt_usbstorage_extensions: "File types", opt_usbstorage_extensions_d: "Extensions to copy. Proxies (LRF, LRV) and thumbnails stay on the device.",
   },
   ro: {
     destination: "Destinație", files: "Fișiere", speed: "Viteză", remaining: "Timp rămas", battery: "Baterie",
@@ -677,6 +684,13 @@ const I18N = {
     opt_gopro_ble: "Sincronizare automată wireless", opt_gopro_ble_d: "Pornește când o cameră asociată e pornită în apropiere.",
     opt_gopro_sleep_after_sync: "Standby la final", opt_gopro_sleep_after_sync_d: "Oprește camera după o sincronizare wireless.",
     opt_gopro_cooldown_minutes: "Pauză wireless", opt_gopro_cooldown_minutes_d: "Minute între două sincronizări wireless ale aceleiași camere.",
+    provider_usbstorage: "Drone și camere USB", adopt: "Adoptă", adoptSync: "Adoptă și sincronizează", newDrive: "Nou",
+    noDrives: "Nimic conectat. Conectează o dronă sau o cameră prin cablul USB (DJI Neo: USB-C) ori un cititor de carduri SD.",
+    knownDrives: "Dispozitive cunoscute", vol_checking: "Se verifică", vol_ready: "Conectat", vol_done: "Sincronizat, poate fi deconectat", vol_error: "Eroare",
+    opt_usbstorage_auto: "Sincronizează la conectare", opt_usbstorage_auto_d: "Dispozitivele adoptate încep sincronizarea imediat ce sunt conectate.",
+    opt_usbstorage_auto_adopt: "Adoptă automat dispozitivele noi", opt_usbstorage_auto_adopt_d: "Altfel, un dispozitiv nou așteaptă până îl adopți aici.",
+    opt_usbstorage_watch_folders: "Foldere urmărite", opt_usbstorage_watch_folders_d: "Foldere unde serverul montează deja unitățile, de exemplu /media. Fiecare subfolder cu DCIM contează ca unitate.",
+    opt_usbstorage_extensions: "Tipuri de fișiere", opt_usbstorage_extensions_d: "Extensiile copiate. Fișierele proxy (LRF, LRV) și miniaturile rămân pe dispozitiv.",
   },
 };
 const LOCALES = { en: "en-GB", ro: "ro-RO" };
@@ -772,7 +786,10 @@ $("#pw-form").addEventListener("submit", async (e) => {
 });
 
 /* ---------- providers & devices ---------- */
-const providerInfo = (kind) => status?.providers?.find((p) => p.kind === kind) || { kind, label: kind, icon: "ph-device-mobile", options: {} };
+const providerInfo = (kind) => {
+  const p = status?.providers?.find((x) => x.kind === kind) || { kind, label: kind, icon: "ph-device-mobile", options: {} };
+  return { ...p, label: I18N[lang][`provider_${kind}`] ?? p.label };
+};
 const devicesOf = (kind) => (settings?.devices || []).filter((d) => d.provider === kind);
 const deviceBtn = (d) => `<button type="button" class="btn ghost icon-btn" title="${esc(t("settings"))}" data-edit-device="${esc(d.id)}"><i class="ph ph-gear-six"></i></button>`;
 const syncBtn = (id, mode) => `<button type="button" class="btn sm" data-sync="${esc(id)}" data-mode="${esc(mode)}"><i class="ph ph-arrows-clockwise"></i>${esc(t("sync"))}</button>`;
@@ -809,12 +826,31 @@ const PROVIDER_UI = {
         <div class="hint"><i class="ph ph-info"></i><span>${esc(t("pairHint"))}</span></div>`
       : `<div class="empty" style="margin-top: 10px"><i class="ph ph-bluetooth-slash"></i>${esc(t("bleLinuxOnly"))}</div>`}
       ${others.length ? `<div class="group-label" style="margin-top: 18px"><i class="ph ph-video-camera"></i><span>${esc(t("otherCameras"))}</span></div>
-        <div class="devices">${others.map(genericDevice).join("")}</div>` : ""}`;
+        <div class="devices">${others.map((d) => genericDevice(d)).join("")}</div>` : ""}`;
+  },
+  usbstorage(s) {
+    const vols = s.usb_volumes || [];
+    const connected = new Set(vols.map((v) => v.device).filter(Boolean));
+    const rows = vols.map((v) => {
+      const dev = settings?.devices?.find((d) => d.id === v.device);
+      const state = v.syncing ? t("syncingNow") : v.state === "error" ? `${t("vol_error")}: ${v.error}` : t(`vol_${v.state}`);
+      const actions = v.syncing ? syncingTag()
+        : dev ? `${syncBtn(v.id, "usb")}${deviceBtn(dev)}`
+        : `<button type="button" class="btn sm" data-adopt="${esc(v.id)}">${esc(t("adopt"))}</button>
+           <button type="button" class="btn primary sm" data-sync="${esc(v.id)}" data-mode="usb"><i class="ph ph-arrows-clockwise"></i>${esc(t("adoptSync"))}</button>`;
+      return `<div class="device"><div class="ico"><i class="ph ${esc(v.icon)}"></i></div>
+        <div class="meta"><div class="name">${esc(dev?.name || v.model)}${dev ? "" : ` <span class="tag warn">${esc(t("newDrive"))}</span>`}</div>
+        <div class="sub">${esc(state)}${v.label ? `, ${esc(v.label)}` : ""}</div></div>${actions}</div>`;
+    }).join("");
+    const offline = devicesOf("usbstorage").filter((d) => !connected.has(d.id));
+    return `<div class="devices">${rows || `<div class="empty"><i class="ph ph-usb"></i>${esc(t("noDrives"))}</div>`}</div>
+      ${offline.length ? `<div class="group-label" style="margin-top: 18px"><i class="ph ph-clock-counter-clockwise"></i><span>${esc(t("knownDrives"))}</span></div>
+        <div class="devices">${offline.map((d) => genericDevice(d, d.config.model || "")).join("")}</div>` : ""}`;
   },
 };
-function genericDevice(d) {
-  const serial = d.config.serial ? t("lastSeenAs", { serial: d.config.serial }) : d.id;
-  return `<div class="device"><div class="ico"><i class="ph ${esc(providerInfo(d.provider).icon)}"></i></div>
+function genericDevice(d, sub) {
+  const serial = sub ?? (d.config.serial ? t("lastSeenAs", { serial: d.config.serial }) : d.id);
+  return `<div class="device"><div class="ico"><i class="ph ${esc(d.config.icon || providerInfo(d.provider).icon)}"></i></div>
     <div class="meta"><div class="name">${esc(d.name || d.id)}</div><div class="sub mono">${esc(serial)}</div></div>${deviceBtn(d)}</div>`;
 }
 function renderProviders(s) {
@@ -822,7 +858,7 @@ function renderProviders(s) {
     const conf = settings?.providers?.[p.kind];
     const off = conf && conf.enabled === false;
     const body = PROVIDER_UI[p.kind] ? PROVIDER_UI[p.kind](s)
-      : (devicesOf(p.kind).length ? `<div class="devices">${devicesOf(p.kind).map(genericDevice).join("")}</div>` : `<div class="empty"><i class="ph ${esc(p.icon)}"></i>${esc(t("noDevices"))}</div>`);
+      : (devicesOf(p.kind).length ? `<div class="devices">${devicesOf(p.kind).map((d) => genericDevice(d)).join("")}</div>` : `<div class="empty"><i class="ph ${esc(p.icon)}"></i>${esc(t("noDevices"))}</div>`);
     return `<div class="provider"><div class="provider-head"><div class="ico"><i class="ph ${esc(p.icon)}"></i></div>
         <div class="meta" style="flex: 1"><div class="name">${esc(p.label)}${off ? ` <span class="tag warn">${esc(t("autoSync"))}: ${esc(t("no"))}</span>` : ""}</div></div>
         <button type="button" class="btn ghost sm" data-edit-provider="${esc(p.kind)}"><i class="ph ph-gear-six"></i>${esc(t("settings"))}</button></div>${body}</div>`;
@@ -937,6 +973,8 @@ function describeDest(dest, key = "") {
 const destById = (id) => settings.destinations.find((d) => d.id === id);
 const credById = (id) => settings.credentials.find((c) => c.id === id);
 const destLabel = (id) => { const d = destById(id); return d ? d.name || d.id : t("notSet"); };
+// A typical file name per provider, for the "files go to" previews.
+const EXAMPLE_FILE = { gopro: "GX010474.MP4", usbstorage: "DJI_20260926160000_0001_D.MP4", bambu: "video_2026-09-26_16-00-00.mp4" };
 function previewHtml(policy, fields, file = "GX010474.MP4") {
   const bad = /\{\w+\}/.exec(renderKey(policy.path, policy.folder_template, fields, ""));
   if (bad) return { cls: "preview bad", html: `<span>${esc(t("tplHelp"))}</span>` };
@@ -1062,10 +1100,10 @@ function rulesHtml(overrides, inherited, origin, providerLabel) {
       <div class="ctl">${ctl}</div></div>`;
   }).join("")}</div><div class="preview" data-rules-preview></div>`;
 }
-function bindRules(root, inherited, fields) {
+function bindRules(root, inherited, fields, file) {
   const update = () => {
     root.querySelectorAll("[data-rule-row]").forEach((row) => row.classList.toggle("inherited", !row.querySelector("[data-rule-on]").checked));
-    setPreview(root.querySelector("[data-rules-preview]"), previewHtml({ ...inherited, ...definedOnly(readRules(root)) }, fields));
+    setPreview(root.querySelector("[data-rules-preview]"), previewHtml({ ...inherited, ...definedOnly(readRules(root)) }, fields, file));
   };
   root.addEventListener("input", update); root.addEventListener("change", update);
   update();
@@ -1097,10 +1135,11 @@ function openProviderEditor(kind) {
   const p = providerInfo(kind);
   const conf = settings.providers?.[kind] || { enabled: true, sync: {}, options: {} };
   const opts = { ...p.options, ...(conf.options || {}) };
+  const optValue = (v) => (Array.isArray(v) ? v.join(", ") : v);
   const optRows = Object.entries(p.options).map(([k, def]) => typeof def === "boolean"
     ? toggleRow(`opt-${k}`, t(`opt_${kind}_${k}`), t(`opt_${kind}_${k}_d`), opts[k])
     : `<div class="field" style="padding: 12px 0; border-top: 1px solid var(--line)"><label for="opt-${k}">${esc(t(`opt_${kind}_${k}`))}</label>
-        <input type="${typeof def === "number" ? "number" : "text"}" id="opt-${k}" value="${esc(opts[k])}"><div class="help">${esc(t(`opt_${kind}_${k}_d`))}</div></div>`).join("");
+        <input type="${typeof def === "number" ? "number" : "text"}" id="opt-${k}" value="${esc(optValue(opts[k]))}"${Array.isArray(def) ? ' class="mono"' : ""}><div class="help">${esc(t(`opt_${kind}_${k}_d`))}</div></div>`).join("");
   const inherited = { ...settings.defaults, credentials: null };
   const origin = Object.fromEntries(RULES.map((r) => [r.key, "global"]));
   const sync = conf.sync || {};
@@ -1109,12 +1148,13 @@ function openProviderEditor(kind) {
     body: `<div class="toggles">${toggleRow("prov-enabled", t("autoSync"), t("autoSyncD", { p: p.label }), conf.enabled !== false)}${optRows}</div>
       <div class="section-label">${esc(t("rulesFor"))}</div><p class="small muted" style="margin: 0 0 8px">${esc(t("rulesForProviderD", { p: p.label }))}</p>
       <div id="prov-rules">${rulesHtml(sync, inherited, origin, p.label)}</div>${actions()}`,
-    onOpen: (root) => { const r = $("#prov-rules", root); setRuleSelects(r, sync, inherited); bindRules(r, inherited, sampleFields(p.label, "", p.label)); },
+    onOpen: (root) => { const r = $("#prov-rules", root); setRuleSelects(r, sync, inherited); bindRules(r, inherited, sampleFields(p.label, "", p.label), EXAMPLE_FILE[kind]); },
     onSave: async () => {
       const options = {};
       for (const [k, def] of Object.entries(p.options)) {
         const el = $(`#opt-${k}`);
-        options[k] = typeof def === "boolean" ? el.checked : typeof def === "number" ? Number(el.value) : el.value;
+        options[k] = typeof def === "boolean" ? el.checked : typeof def === "number" ? Number(el.value)
+          : Array.isArray(def) ? el.value.split(/[\s,]+/).filter(Boolean) : el.value;
       }
       await saveSettings((s) => {
         s.providers[kind] = { ...(s.providers[kind] || {}), enabled: $("#prov-enabled").checked, options, sync: readRules($("#prov-rules")) };
@@ -1140,9 +1180,12 @@ function openDeviceEditor(id) {
       ${actions(`<button type="submit" class="btn ghost danger" data-action="delete" formnovalidate><i class="ph ph-trash"></i>${esc(t("forget"))}</button>`)}`,
     onOpen: (root) => {
       const r = $("#dev-rules", root); setRuleSelects(r, d.sync, inherited);
-      const fields = () => sampleFields(p.label, $("#dev-name").value, model);
-      bindRules(r, inherited, fields());
-      $("#dev-name").addEventListener("input", () => setPreview($("[data-rules-preview]", r), previewHtml({ ...inherited, ...definedOnly(readRules(r)) }, fields())));
+      // {provider} is the maker for USB drives ("DJI"), as on the server.
+      const maker = d.provider === "usbstorage" ? ({ dji: "DJI", insta360: "Insta360", gopro: "GoPro" }[d.config.profile] || "Camera") : p.label;
+      const fields = () => sampleFields(maker, $("#dev-name").value, model);
+      const file = EXAMPLE_FILE[d.provider];
+      bindRules(r, inherited, fields(), file);
+      $("#dev-name").addEventListener("input", () => setPreview($("[data-rules-preview]", r), previewHtml({ ...inherited, ...definedOnly(readRules(r)) }, fields(), file)));
     },
     onSave: async (action) => {
       if (action === "delete") {
@@ -1368,7 +1411,7 @@ async function scanBle() {
   ui.scanning = false; renderStatus(status);
 }
 document.addEventListener("click", async (e) => {
-  const el = e.target.closest("[data-pair],[data-sync],[data-cancel],[data-host],[data-share],[data-close],[data-scan],[data-discover],[data-browse],[data-edit-dest],[data-edit-cred],[data-edit-provider],[data-edit-device]");
+  const el = e.target.closest("[data-adopt],[data-pair],[data-sync],[data-cancel],[data-host],[data-share],[data-close],[data-scan],[data-discover],[data-browse],[data-edit-dest],[data-edit-cred],[data-edit-provider],[data-edit-device]");
   if (!el) return;
   const d = el.dataset;
   if (d.close) { $(`#${d.close}`).hidden = true; return; }
@@ -1385,6 +1428,10 @@ document.addEventListener("click", async (e) => {
     el.disabled = true;
     if (d.sync) { toast((await post("/api/sync", { mode: d.mode, camera: d.sync })).message); }
     else if (d.cancel) { await post("/api/sync/cancel", { session: d.cancel }); }
+    else if (d.adopt) {
+      settings = await post("/api/devices", { provider: "usbstorage", config: { volume: d.adopt } });
+      renderSettings(); renderStatus(status); openDeviceEditor(d.adopt);
+    }
     else if (d.pair) {
       await post("/api/ble/pair", { address: d.pair, name: d.name }); toast(t("pairedToast")); ui.found = null;
       settings = await api("/api/settings"); renderSettings(); renderStatus(await api("/api/status"));

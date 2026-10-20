@@ -485,8 +485,8 @@ def create_app(service: SyncService, auth: AuthStore) -> FastAPI:
     # --- library -----------------------------------------------------------
 
     @app.get("/api/library")
-    async def library(offset: int = 0, limit: int = 60, provider: str | None = None):
-        items, total = service.store.library(max(offset, 0), min(max(limit, 1), 200), provider or None)
+    async def library(offset: int = 0, limit: int = 60, provider: str | None = None, kind: str | None = None):
+        items, total = service.store.library(max(offset, 0), min(max(limit, 1), 200), provider or None, kind or None)
         for item in items:
             item["name"] = item["path"].rsplit("/", 1)[-1]
             item["thumb"] = (service.thumbs / thumb_name(item["dest"])).exists()

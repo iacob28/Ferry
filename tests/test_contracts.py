@@ -4,7 +4,7 @@ import pytest
 
 from ferry.core.service import SyncService
 from ferry.core.session import Session
-from ferry.core.settings import SettingsStore, env
+from ferry.core.settings import DestinationConfig, SettingsStore, env
 from ferry.core.store import Store
 from ferry.destinations import LocalDestination
 from ferry.providers.base import Provider
@@ -86,7 +86,7 @@ def test_env_prefers_ferry_and_falls_back_to_legacy(monkeypatch):
 
 
 async def test_local_destination_put_stat_and_range(tmp_path):
-    dest = LocalDestination(str(tmp_path / "nas"))
+    dest = LocalDestination(DestinationConfig(id="nas", type="local", path=str(tmp_path / "nas")))
     src = tmp_path / "file.bin"
     src.write_bytes(bytes(range(256)) * 8)
     assert await dest.stat("a/b/file.bin") is None

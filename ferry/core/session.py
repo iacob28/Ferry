@@ -24,10 +24,12 @@ class Session:
     started_at: float = field(default_factory=time.time)
     task: asyncio.Task | None = None
     provider: str = ""
+    # Id of the device in settings.devices, once known; selects its sync rules.
+    device: str | None = None
 
     def snapshot(self) -> dict:
         return {
-            "id": self.id, "provider": self.provider, "mode": self.mode, "name": self.name, "state": self.state,
+            "id": self.id, "provider": self.provider, "device": self.device, "mode": self.mode, "name": self.name, "state": self.state,
             "camera": self.camera, "battery": self.battery, "radio": self.radio, "started_at": self.started_at,
             "progress": self.progress.snapshot() if self.progress else None,
         }

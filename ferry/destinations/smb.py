@@ -6,17 +6,20 @@ import errno
 from pathlib import Path
 from typing import BinaryIO, Callable
 
-from ..core.settings import SmbSettings
+from ..core.settings import Credential, DestinationConfig
 from .base import Destination, DestinationError, RemoteObject, copy_stream
 
 
 class SmbDestination(Destination):
     kind = "smb"
+    credential_kinds = frozenset({"password"})
 
-    def __init__(self, cfg: SmbSettings):
+    def __init__(self, cfg: DestinationConfig, credential: Credential | None = None):
         if not (cfg.host and cfg.share):
             raise DestinationError("SMB host and share must be configured")
         self.cfg = cfg
+        self.username = credential.username if credential else ""
+        self.password = credential.password if credential else ""
         parts = [p for p in cfg.base_path.replace("\\", "/").split("/") if p]
         self.root = "\\".join([rf"\\{cfg.host}\{cfg.share}", *parts])
 
@@ -31,8 +34,8 @@ class SmbDestination(Destination):
 
         smbclient.register_session(
             self.cfg.host,
-            username=self.cfg.username or None,
-            password=self.cfg.password or None,
+            username=self.username or None,
+            password=self.password or None,
             connection_timeout=15,
         )
 

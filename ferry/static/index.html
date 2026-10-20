@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ferry</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%230a84d6'/%3E%3Crect x='7' y='10' width='13' height='12' rx='3' fill='white'/%3E%3Cpath d='M21 14l5-3v10l-5-3z' fill='white'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%230a84d6'/%3E%3Cpath d='M6 18h20l-3 6H9z' fill='white'/%3E%3Cpath d='M15 7v10h-6z' fill='white'/%3E%3Cpath d='M17 9v8h5z' fill='white'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/static/vendor/geist/geist.css">
 <link rel="stylesheet" href="/static/vendor/phosphor/light.css">
 <link rel="stylesheet" href="/static/vendor/phosphor/fill.css">
@@ -172,13 +172,13 @@
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
   .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
-  .stack { display: grid; gap: 24px; }
+  .stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
 
   /* Device rows */
   .group-label { font-size: 10.5px; font-weight: 600; color: var(--faint); margin: 2px 0 10px; display: flex; align-items: center; gap: 7px;
                  text-transform: uppercase; letter-spacing: .16em; }
   .group-label i { font-size: 15px; }
-  .devices { display: grid; gap: 8px; }
+  .devices { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .device { display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 12px; border-radius: var(--r-tile); background: var(--surface-2);
             box-shadow: inset 0 0 0 1px var(--hair); transition: box-shadow .4s var(--spring), transform .5s var(--spring); }
   .device.clickable { cursor: pointer; }
@@ -340,13 +340,58 @@
     .fields, .inline-fields { grid-template-columns: 1fr; }
     .lib-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   }
+
+  /* Editor sheets: the same double bezel, floating over a dimmed page. */
+  .sheet { border: 0; padding: 0; background: transparent; width: min(660px, calc(100vw - 24px)); max-height: calc(100dvh - 32px);
+           color: var(--text); overflow: visible; }
+  .sheet::backdrop { background: rgb(10 14 20 / .4); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  .sheet[open] > .panel { animation: rise .6s var(--spring) both; }
+  .sheet .core { max-height: calc(100dvh - 46px); overflow: auto; }
+  .sheet-actions { display: flex; gap: 10px; justify-content: flex-end; align-items: center; flex-wrap: wrap; margin-top: 22px; }
+  .sheet-actions .left { margin-right: auto; }
+  .section-label { font-size: 10.5px; font-weight: 600; color: var(--faint); margin: 22px 0 8px; text-transform: uppercase; letter-spacing: .16em; }
+  .section-label:first-child { margin-top: 0; }
+  select { font: inherit; font-size: 14px; color: var(--text); background-color: var(--surface-2); border: 0; border-radius: var(--r-ctl);
+           padding: 11px 38px 11px 14px; width: 100%; appearance: none; cursor: pointer;
+           box-shadow: inset 0 0 0 1px var(--hair), inset 0 1px 2px rgb(16 24 40 / .04);
+           background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+           background-position: calc(100% - 20px) 50%, calc(100% - 15px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
+
+  /* Rules: each value is inherited from the layer below until overridden. */
+  .rules { display: grid; }
+  .rule { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 14px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+  .rule:first-child { border-top: 0; padding-top: 2px; }
+  .rule .lbl { font-size: 13px; font-weight: 500; color: var(--muted); }
+  .rule .inherit { grid-column: 1 / -1; font-size: 12.5px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rule .inherit b { font-weight: 500; color: var(--muted); }
+  .rule .ctl { grid-column: 1 / -1; }
+  .rule.inherited .ctl, .rule:not(.inherited) .inherit { display: none; }
+  .override { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); cursor: pointer; }
+  .switch.sm { width: 36px; height: 22px; }
+  .switch.sm span::after { top: 3px; left: 3px; width: 16px; height: 16px; }
+  .switch.sm input:checked + span::after { transform: translateX(14px); }
+  .preview { margin-top: 16px; padding: 12px 14px; border-radius: var(--r-tile); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--hair);
+             display: grid; gap: 3px; font-size: 12.5px; }
+  .preview .k { font-size: 10.5px; color: var(--faint); text-transform: uppercase; letter-spacing: .14em; font-weight: 600; }
+  .preview .mono { overflow-wrap: anywhere; }
+  .preview.bad { background: var(--err-soft); color: var(--err); box-shadow: none; }
+
+  /* Provider groups in the Devices panel */
+  .provider + .provider { margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--line); }
+  .provider-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .provider-head .ico { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-ink); flex: none; }
+  .provider-head .name { font-weight: 600; letter-spacing: -.01em; }
+  .provider-head .sub { font-size: 12.5px; color: var(--muted); }
+  .tag.warn { background: var(--warn-soft); color: var(--warn); box-shadow: none; }
+  .lib-filter { margin-bottom: 18px; }
+  .lib-filter button { padding: 6px 12px; font-size: 13px; }
 </style>
 </head>
 <body>
 
 <div id="auth" class="auth" hidden>
   <div class="panel"><form id="auth-form" class="core auth-card">
-    <div class="brand"><div class="brand-mark"><i class="ph-fill ph-video-camera"></i></div>Ferry</div>
+    <div class="brand"><div class="brand-mark"><i class="ph-fill ph-boat"></i></div>Ferry</div>
     <span class="eyebrow"><i class="ph ph-shield-check" style="font-size: 13px"></i><span data-i18n="secureArea">Admin</span></span>
     <h1 id="auth-title"></h1>
     <p id="auth-sub"></p>
@@ -361,9 +406,9 @@
 <div id="app" hidden>
 <header class="topbar">
   <div class="topbar-inner">
-    <div class="brand"><div class="brand-mark"><i class="ph-fill ph-video-camera"></i></div><span class="brand-name">Ferry</span></div>
+    <div class="brand"><div class="brand-mark"><i class="ph-fill ph-boat"></i></div><span class="brand-name">Ferry</span></div>
     <div class="spacer"></div>
-    <div class="target-hint" data-i18n-title="destination"><i class="ph ph-hard-drives"></i><span id="target-hint"></span></div>
+    <div class="target-hint" data-i18n-title="defaultDestination"><i class="ph ph-hard-drives"></i><span id="target-hint"></span></div>
     <div class="seg lang" role="group" aria-label="Language"><button type="button" data-lang="en">EN</button><button type="button" data-lang="ro">RO</button></div>
     <span id="state" class="pill"><span class="live"></span><span id="state-text"></span></span>
     <button class="btn ghost icon-btn" id="logout" data-i18n-title="signOut"><i class="ph ph-sign-out"></i></button>
@@ -380,7 +425,7 @@
     </div>
     <aside class="hero-side">
       <p class="lead" data-i18n="startManually">Start manually</p>
-      <button class="btn primary block" id="sync-all"><i class="ph ph-arrows-clockwise"></i><span data-i18n="syncAll">Sync all cameras</span></button>
+      <button class="btn primary block" id="sync-all"><i class="ph ph-arrows-clockwise"></i><span data-i18n="syncAll">Sync all devices</span></button>
       <button class="btn ghost danger block" id="cancel-all" hidden><i class="ph ph-stop-circle"></i><span data-i18n="stopAll">Stop all</span></button>
       <div class="totals">
         <div><div class="small muted" data-i18n="filesSaved">Files saved</div><div class="v num" id="tot-files">0</div></div>
@@ -397,6 +442,7 @@
       <button class="btn ghost icon-btn" id="lib-refresh" data-i18n-title="refresh"><i class="ph ph-arrow-clockwise"></i></button>
     </div>
     <div class="panel-body">
+      <div class="seg lib-filter" id="lib-filter" hidden></div>
       <div id="lib-body"><div class="skeleton"></div></div>
       <div class="lib-more" id="lib-more" hidden><button class="btn sm" id="lib-load-more"><span data-i18n="loadMore">Load more</span></button></div>
     </div>
@@ -405,20 +451,8 @@
   <div class="cols">
     <div class="stack">
       <section class="panel reveal" style="--i:1"><div class="core">
-        <div class="panel-head"><i class="ph ph-camera"></i><h2 data-i18n="cameras">Cameras</h2></div>
-        <div class="panel-body">
-          <div class="group-label"><i class="ph ph-usb"></i><span data-i18n="connectedUsb">Connected over USB</span></div>
-          <div class="devices" id="usb"><div class="skeleton"></div></div>
-
-          <div class="group-label" style="margin-top: 18px"><i class="ph ph-bluetooth"></i><span data-i18n="pairedBle">Paired over Bluetooth</span></div>
-          <div id="ble-na" class="empty" hidden><i class="ph ph-bluetooth-slash"></i><span data-i18n="bleLinuxOnly"></span></div>
-          <div id="ble-tools">
-            <div class="devices" id="paired"></div>
-            <div style="display: flex; gap: 8px; margin-top: 12px"><button class="btn sm" id="scan"><i class="ph ph-magnifying-glass"></i><span data-i18n="scan">Find cameras</span></button></div>
-            <div class="devices" id="found" style="margin-top: 10px"></div>
-            <div class="hint"><i class="ph ph-info"></i><span data-i18n="pairHint"></span></div>
-          </div>
-        </div>
+        <div class="panel-head"><i class="ph ph-devices"></i><h2 data-i18n="devices">Devices</h2></div>
+        <div class="panel-body" id="providers"><div class="skeleton"></div></div>
       </div></section>
 
       <section class="panel reveal" style="--i:3"><div class="core">
@@ -438,74 +472,44 @@
     </div>
 
     <div class="stack">
-      <form id="settings" class="stack" autocomplete="off">
-        <section class="panel reveal" style="--i:2"><div class="core">
-          <div class="panel-head"><i class="ph ph-hard-drives"></i><h2 data-i18n="destination">Destination</h2></div>
-          <div class="panel-body">
-            <div class="seg" style="margin-bottom: 16px">
-              <input type="radio" name="target" value="smb" id="t-smb"><label for="t-smb"><i class="ph ph-network"></i><span data-i18n="networkShare">Network share (SMB)</span></label>
-              <input type="radio" name="target" value="local" id="t-local"><label for="t-local"><i class="ph ph-folder"></i><span data-i18n="localFolder">Local folder</span></label>
-            </div>
-            <div data-for="smb">
-              <div class="fields">
-                <div class="field full"><label for="f-host" data-i18n="server">Server</label>
-                  <div class="with-btn"><input type="text" id="f-host" name="smb.host" placeholder="nas.local">
-                    <button type="button" class="btn" id="discover"><i class="ph ph-binoculars"></i><span data-i18n="discover">Discover</span></button></div>
-                  <div class="picker" id="hosts" hidden></div>
-                </div>
-                <div class="field"><label for="f-user" data-i18n="username">Username</label><input type="text" id="f-user" name="smb.username"></div>
-                <div class="field"><label for="f-pass" data-i18n="password">Password</label><input type="password" id="f-pass" name="smb.password" autocomplete="new-password"></div>
-                <div class="field full"><label for="f-share" data-i18n="share">Share</label>
-                  <div class="with-btn"><input type="text" id="f-share" name="smb.share">
-                    <button type="button" class="btn" id="browse"><i class="ph ph-folders"></i><span data-i18n="browse">Browse</span></button></div>
-                  <div class="picker" id="shares" hidden></div>
-                </div>
-                <div class="field full"><label for="f-base" data-i18n="subfolder">Subfolder in share</label><input type="text" id="f-base" name="smb.base_path" data-i18n-placeholder="optional"></div>
-              </div>
-            </div>
-            <div class="fields" data-for="local">
-              <div class="field full"><label for="f-local" data-i18n="path">Path</label><input type="text" id="f-local" name="local_path" placeholder="/data/library">
-                <div class="help" data-i18n="localHelp"></div></div>
-            </div>
-            <div class="fields" style="margin-top: 14px">
-              <div class="field full">
-                <label for="f-tpl" data-i18n="folderLayout">Folder layout</label>
-                <input type="text" id="f-tpl" name="folder_template" class="mono" placeholder="{year}/{date}">
-                <div class="help"><span data-i18n="tplHelp"></span> <span class="mono" id="tpl-preview"></span></div>
-              </div>
-            </div>
-            <div class="save-bar">
-              <button type="button" class="btn" id="test"><i class="ph ph-plugs-connected"></i><span data-i18n="test">Test</span></button>
-              <button type="submit" class="btn primary"><i class="ph ph-check"></i><span data-i18n="save">Save</span></button>
-            </div>
-          </div>
-        </div></section>
+      <section class="panel reveal" style="--i:2"><div class="core">
+        <div class="panel-head">
+          <i class="ph ph-hard-drives"></i><h2 data-i18n="destinations">Destinations</h2><div class="spacer"></div>
+          <button type="button" class="btn sm" data-edit-dest=""><i class="ph ph-plus"></i><span data-i18n="add">Add</span></button>
+        </div>
+        <div class="panel-body">
+          <div class="devices" id="dest-list"></div>
+          <div class="group-label" style="margin-top: 22px"><i class="ph ph-key"></i><span data-i18n="credentials">Credentials</span></div>
+          <div class="devices" id="cred-list"></div>
+          <div style="margin-top: 12px"><button type="button" class="btn sm" data-edit-cred=""><i class="ph ph-plus"></i><span data-i18n="addCredentials">Add credentials</span></button></div>
+        </div>
+      </div></section>
 
-        <section class="panel reveal" style="--i:4"><div class="core">
-          <div class="panel-head"><i class="ph ph-sliders-horizontal"></i><h2 data-i18n="behaviour">Behaviour</h2></div>
-          <div class="panel-body">
-            <div class="toggles">
-              <label class="toggle"><span class="txt"><div class="t" data-i18n="autoUsb"></div><div class="d" data-i18n="autoUsbD"></div></span>
-                <span class="switch"><input type="checkbox" name="usb_enabled"><span></span></span></label>
-              <label class="toggle"><span class="txt"><div class="t" data-i18n="autoBle"></div><div class="d" data-i18n="autoBleD"></div></span>
-                <span class="switch"><input type="checkbox" name="ble_enabled"><span></span></span></label>
-              <label class="toggle"><span class="txt"><div class="t" data-i18n="sleepAfter"></div><div class="d" data-i18n="sleepAfterD"></div></span>
-                <span class="switch"><input type="checkbox" name="sleep_after_sync"><span></span></span></label>
-              <label class="toggle risky"><span class="txt"><div class="t" data-i18n="deleteAfter"></div><div class="d" data-i18n="deleteAfterD"></div></span>
-                <span class="switch"><input type="checkbox" name="delete_after_sync"><span></span></span></label>
-            </div>
-            <div class="inline-fields">
-              <div class="field"><label for="f-radios" data-i18n="wifiIfaces">Wi-Fi radios</label><input type="text" id="f-radios" name="wifi_interfaces" class="mono" placeholder="wlan0, wlan1">
-                <div class="help" data-i18n="wifiIfacesD"></div></div>
-              <div class="field"><label for="f-par" data-i18n="parallel">Parallel syncs</label><input type="number" id="f-par" name="max_parallel_syncs" min="1" max="16">
-                <div class="help" data-i18n="parallelD"></div></div>
-              <div class="field"><label for="f-cool" data-i18n="cooldown">Wireless pause</label><input type="number" id="f-cool" name="ble_cooldown_minutes" min="1">
-                <div class="help" data-i18n="minutes"></div></div>
-            </div>
-            <div class="save-bar"><button type="submit" class="btn primary"><i class="ph ph-check"></i><span data-i18n="save">Save</span></button></div>
+      <form class="panel reveal" style="--i:4" id="rules-form" autocomplete="off"><div class="core">
+        <div class="panel-head"><i class="ph ph-sliders-horizontal"></i><h2 data-i18n="syncRules">Sync rules</h2></div>
+        <div class="panel-body">
+          <p class="small muted" style="margin: 0 0 16px" data-i18n="syncRulesD"></p>
+          <div class="fields">
+            <div class="field full"><label for="g-destination" data-i18n="destination">Destination</label><select id="g-destination" name="destination"></select></div>
+            <div class="field full"><label for="g-path" data-i18n="folderInDest">Folder in the destination</label>
+              <input type="text" id="g-path" name="path" class="mono" placeholder="{provider}"><div class="help" data-i18n="pathHelp"></div></div>
+            <div class="field full"><label for="g-folder_template" data-i18n="folderLayout">Folder layout</label>
+              <input type="text" id="g-folder_template" name="folder_template" class="mono" placeholder="{year}/{date}"><div class="help" data-i18n="tplHelp"></div></div>
           </div>
-        </div></section>
-      </form>
+          <div class="toggles" style="margin-top: 14px">
+            <label class="toggle risky"><span class="txt"><div class="t" data-i18n="deleteAfter"></div><div class="d" data-i18n="deleteAfterD"></div></span>
+              <span class="switch"><input type="checkbox" id="g-delete_after_sync" name="delete_after_sync"><span></span></span></label>
+          </div>
+          <div class="preview" id="g-preview"></div>
+          <div class="inline-fields" style="grid-template-columns: repeat(2, minmax(0, 1fr))">
+            <div class="field"><label for="g-radios" data-i18n="wifiIfaces">Wi-Fi radios</label><input type="text" id="g-radios" class="mono" placeholder="wlan0, wlan1">
+              <div class="help" data-i18n="wifiIfacesD"></div></div>
+            <div class="field"><label for="g-par" data-i18n="parallel">Parallel syncs</label><input type="number" id="g-par" min="1" max="16">
+              <div class="help" data-i18n="parallelD"></div></div>
+          </div>
+          <div class="save-bar"><button type="submit" class="btn primary"><i class="ph ph-check"></i><span data-i18n="save">Save</span></button></div>
+        </div>
+      </div></form>
 
       <section class="panel reveal" style="--i:5"><div class="core">
         <div class="panel-head"><i class="ph ph-lock-key"></i><h2 data-i18n="security">Security</h2></div>
@@ -522,6 +526,15 @@
   <p class="small muted" style="text-align: center; margin: 0">Ferry <span id="version"></span></p>
 </main>
 </div>
+
+<dialog id="editor" class="sheet" aria-labelledby="ed-title">
+  <div class="panel"><form class="core" id="editor-form" autocomplete="off" novalidate>
+    <div class="panel-head"><i class="ph" id="ed-icon"></i><h2 id="ed-title"></h2><div class="spacer"></div>
+      <button type="button" class="btn ghost icon-btn" id="ed-close" data-i18n-title="close"><i class="ph ph-x"></i></button></div>
+    <div class="panel-body" id="ed-body"></div>
+  </form></div>
+</dialog>
+
 <dialog id="viewer" aria-labelledby="v-name">
   <div class="v-wrap">
     <div class="v-bar">
@@ -541,87 +554,129 @@
 const I18N = {
   en: {
     destination: "Destination", files: "Files", speed: "Speed", remaining: "Time left", battery: "Battery",
-    startManually: "Start manually", syncAll: "Sync all cameras", stopAll: "Stop all", sync: "Sync", stop: "Stop",
-    filesSaved: "Files saved", totalSize: "Total size", cameras: "Cameras", connectedUsb: "Connected over USB",
+    startManually: "Start manually", syncAll: "Sync all devices", stopAll: "Stop all", sync: "Sync", stop: "Stop",
+    filesSaved: "Files saved", totalSize: "Total size", devices: "Devices", connectedUsb: "Connected over USB",
     pairedBle: "Paired over Bluetooth", bleLinuxOnly: "Bluetooth works only when the service runs on Linux (for example a Raspberry Pi).",
     scan: "Find cameras", pairHint: "To pair, on the camera open Preferences, Connections, Connect Device, GoPro Quik App.",
     activity: "Activity", history: "History", log: "Log", networkShare: "Network share (SMB)", localFolder: "Local folder",
     server: "Server", discover: "Discover", share: "Share", browse: "Browse", username: "Username", password: "Password",
     subfolder: "Subfolder in share", optional: "optional", path: "Path", localHelp: "A folder inside the container, usually a mounted volume.",
-    folderLayout: "Folder layout", tplHelp: "Variables: {year} {month} {day} {date} {camera}. Example:", test: "Test", save: "Save",
-    behaviour: "Behaviour", autoUsb: "Automatic USB sync", autoUsbD: "Starts when a camera is plugged in.",
-    autoBle: "Automatic wireless sync", autoBleD: "Starts when a paired camera is switched on nearby.",
-    sleepAfter: "Standby when done", sleepAfterD: "Puts the camera to sleep after a wireless sync.",
-    deleteAfter: "Delete from card after verification", deleteAfterD: "Only once every file has the same size on the destination.",
-    wifiIfaces: "Wi-Fi radios", wifiIfacesD: "One camera per radio at a time. Never the host's own connection.",
-    parallel: "Parallel syncs", parallelD: "USB and wireless together.", cooldown: "Wireless pause", minutes: "Minutes between wireless syncs of the same camera.",
+    folderLayout: "Folder layout", tplHelp: "Variables: {year} {month} {day} {date} {provider} {device} {model}.",
+    folderInDest: "Folder in the destination", pathHelp: "Variables work here too, for example {provider} or {device}.",
+    test: "Test", save: "Save", add: "Add", delete: "Delete", deleted: "Deleted",
+    deleteAfter: "Delete from the device after verification", deleteAfterD: "Only once every file has the same size on the destination.",
+    wifiIfaces: "Wi-Fi radios", wifiIfacesD: "One device per radio at a time. Never the host's own connection.",
+    parallel: "Parallel syncs", parallelD: "All devices together.",
     security: "Security", currentPassword: "Current password", newPassword: "New password", changePassword: "Change password",
     confirmPassword: "Confirm password", signOut: "Sign out", passwordChanged: "Password changed",
     setupTitle: "Welcome", setupSub: "Create the admin password for this Ferry server.", setupBtn: "Create password",
     loginTitle: "Sign in", loginSub: "Enter the admin password.", loginBtn: "Sign in", mismatch: "The passwords don't match.",
     state_idle: "Idle", state_syncing: "Syncing", state_pairing: "Pairing", s_connecting: "Connecting", s_syncing: "Transferring",
-    loading: "Loading…", idleTitle: "Everything is up to date", idlePaired: "Switch a camera on nearby or plug it in, and the sync starts by itself.",
-    idleUnpaired: "Plug a camera in over USB or pair one over Bluetooth.", syncingTitle: "Syncing {n} camera(s)",
-    syncingSub: "{done} of {total} transferred across all cameras.", pairingTitle: "Pairing a camera", pairingSub: "Keep the camera on and in pairing mode.",
+    loading: "Loading…", idleTitle: "Everything is up to date", idlePaired: "Plug a device in or switch a paired camera on nearby, and the sync starts by itself.",
+    idleUnpaired: "Plug a device in over USB or pair a camera over Bluetooth.", syncingTitle: "Syncing {n} device(s)",
+    syncingSub: "{done} of {total} transferred across all devices.", pairingTitle: "Pairing a camera", pairingSub: "Keep the camera on and in pairing mode.",
     usbOn: "GoPro on {iface}", noUsb: "No camera on USB. Plug a camera in and switch it on.", syncingNow: "Syncing",
     standby: "Standby", poweredOn: "On", seen: "{state}, seen {when}, {rssi} dBm", notSeen: "Not seen yet",
-    remove: "Remove", noPaired: "No paired camera yet.", of: "of", deleting: "Deleting verified files from the card",
-    connectingUsb: "Getting the USB transfer ready", connectingBle: "Waking the camera's Wi-Fi over Bluetooth", listing: "Reading the camera's media list",
+    remove: "Remove", noPaired: "No paired camera yet.", of: "of", deleting: "Deleting verified files from the device",
+    connectingUsb: "Getting the USB transfer ready", connectingBle: "Waking the camera's Wi-Fi over Bluetooth", connectingAny: "Connecting to the device",
+    listing: "Reading the device's media list",
     now: "just now", minAgo: "{n} min ago", saved: "Settings saved", testOk: "Connection works: {target}",
     paired: "Paired", pair: "Pair", noneFound: "No camera found. Check that it is on and in pairing mode.",
-    pairedToast: "Camera paired", removedToast: "Camera removed", notSet: "not set",
-    usbCamera: "USB camera", wirelessCamera: "Wireless camera", wireless: "wireless", nFiles: "{n} files", nothingNew: "Nothing new",
+    pairedToast: "Camera paired", removedToast: "Device removed", notSet: "not set",
+    usbCamera: "USB device", wirelessCamera: "Wireless device", nFiles: "{n} files", nothingNew: "Nothing new",
+    mode_usb: "USB", mode_wifi: "wireless", mode_lan: "network",
     run_ok: "Done", run_failed: "Failed", run_running: "Running", run_cancelled: "Stopped", run_interrupted: "Interrupted",
     noRuns: "No syncs yet.", unreachable: "The service is not responding",
     searchingNet: "Searching the network…", hostsFound: "{n} hosts found", noHosts: "No file servers found on the network.",
-    smbOnly: "Only SMB is supported as a destination for now.", sharesOn: "Shares on {host}", noShares: "No shares visible with these credentials.",
+    smbOnly: "Only SMB servers can be picked here.", sharesOn: "Shares on {host}", noShares: "No shares visible with these credentials.",
     pickHostFirst: "Enter or discover a server first.", close: "Close", radio: "radio {r}",
     eyebrow: "Offload station", secureArea: "Admin",
-    library: "Library", libCount: "{n} files on {target}", libEmpty: "Synced photos and videos appear here.", loadMore: "Load more",
+    library: "Library", libCount: "{n} files", libEmpty: "Synced photos and videos appear here.", loadMore: "Load more", all: "All",
     refresh: "Refresh", previous: "Previous", next: "Next", download: "Download",
     cantPlay: "This browser cannot play this video. GoPro HEVC files (GX) play in Safari, and in Chrome or Edge with hardware decoding.",
+    destinations: "Destinations", credentials: "Credentials", addCredentials: "Add credentials", defaultDestination: "Default destination",
+    defaultTag: "Default", noDestinations: "No destination yet. Add the NAS or folder where media should go.",
+    noCredentials: "No saved credentials. SMB shares usually need a username and password.",
+    syncRules: "Sync rules", syncRulesD: "Defaults for every device. Each provider and each device can override any of them.",
+    newDestination: "New destination", editDestination: "Destination", name: "Name", type: "Type",
+    credNone: "None (guest access)", credNew: "New credentials…", newCredentials: "New credentials", editCredentials: "Credentials",
+    filesGoTo: "Files go to", exampleFile: "for a file taken on 26 September 2026",
+    settings: "Settings", providerSettings: "{p} settings", deviceSettings: "Device settings",
+    autoSync: "Automatic sync", autoSyncD: "Lets {p} devices start a sync on their own. Manual syncs always work.",
+    options: "Options", rulesFor: "Sync rules", rulesForProviderD: "Overrides the global rules for every {p} device.",
+    rulesForDeviceD: "Overrides the global and {p} rules for this device only.",
+    override: "Override", inheritedFrom: "From {layer}: {value}", layer_global: "global rules", layer_provider: "{p} settings",
+    ownCredentials: "the destination's own", yes: "Yes", no: "No", empty: "(none)",
+    deviceEnabled: "Sync this device automatically", deviceEnabledD: "When off, it only syncs when you press Sync.",
+    details: "Details", forget: "Remove device", otherCameras: "Known cameras", noDevices: "No device yet.",
+    lastSeenAs: "Serial {serial}", unsavedChanges: "Save first",
+    opt_gopro_usb: "Automatic USB sync", opt_gopro_usb_d: "Starts when a camera is plugged in.",
+    opt_gopro_ble: "Automatic wireless sync", opt_gopro_ble_d: "Starts when a paired camera is switched on nearby.",
+    opt_gopro_sleep_after_sync: "Standby when done", opt_gopro_sleep_after_sync_d: "Puts the camera to sleep after a wireless sync.",
+    opt_gopro_cooldown_minutes: "Wireless pause", opt_gopro_cooldown_minutes_d: "Minutes between wireless syncs of the same camera.",
   },
   ro: {
     destination: "Destinație", files: "Fișiere", speed: "Viteză", remaining: "Timp rămas", battery: "Baterie",
-    startManually: "Pornește manual", syncAll: "Sincronizează toate camerele", stopAll: "Oprește tot", sync: "Sincronizează", stop: "Oprește",
-    filesSaved: "Fișiere salvate", totalSize: "Volum total", cameras: "Camere", connectedUsb: "Conectate prin USB",
+    startManually: "Pornește manual", syncAll: "Sincronizează toate dispozitivele", stopAll: "Oprește tot", sync: "Sincronizează", stop: "Oprește",
+    filesSaved: "Fișiere salvate", totalSize: "Volum total", devices: "Dispozitive", connectedUsb: "Conectate prin USB",
     pairedBle: "Asociate prin Bluetooth", bleLinuxOnly: "Bluetooth funcționează doar când serviciul rulează pe Linux (de exemplu pe un Raspberry Pi).",
     scan: "Caută camere", pairHint: "Pentru asociere, pe cameră: Preferințe, Conexiuni, Conectare dispozitiv, Aplicația GoPro Quik.",
     activity: "Activitate", history: "Istoric", log: "Jurnal", networkShare: "Share de rețea (SMB)", localFolder: "Folder local",
     server: "Server", discover: "Descoperă", share: "Share", browse: "Răsfoiește", username: "Utilizator", password: "Parolă",
     subfolder: "Subfolder în share", optional: "opțional", path: "Cale", localHelp: "Un folder din container, de obicei un volum montat.",
-    folderLayout: "Structura folderelor", tplHelp: "Variabile: {year} {month} {day} {date} {camera}. Exemplu:", test: "Testează", save: "Salvează",
-    behaviour: "Comportament", autoUsb: "Sincronizare automată pe USB", autoUsbD: "Pornește când o cameră e conectată prin cablu.",
-    autoBle: "Sincronizare automată wireless", autoBleD: "Pornește când o cameră asociată e pornită în apropiere.",
-    sleepAfter: "Standby la final", sleepAfterD: "Oprește camera după o sincronizare wireless.",
-    deleteAfter: "Șterge de pe card după verificare", deleteAfterD: "Doar după ce fiecare fișier are aceeași dimensiune pe destinație.",
-    wifiIfaces: "Plăci Wi-Fi", wifiIfacesD: "O cameră per placă, pe rând. Niciodată conexiunea serverului la rețea.",
-    parallel: "Sincronizări în paralel", parallelD: "USB și wireless împreună.", cooldown: "Pauză wireless", minutes: "Minute între două sincronizări wireless ale aceleiași camere.",
+    folderLayout: "Structura folderelor", tplHelp: "Variabile: {year} {month} {day} {date} {provider} {device} {model}.",
+    folderInDest: "Folder în destinație", pathHelp: "Și aici merg variabilele, de exemplu {provider} sau {device}.",
+    test: "Testează", save: "Salvează", add: "Adaugă", delete: "Șterge", deleted: "Șters",
+    deleteAfter: "Șterge de pe dispozitiv după verificare", deleteAfterD: "Doar după ce fiecare fișier are aceeași dimensiune pe destinație.",
+    wifiIfaces: "Plăci Wi-Fi", wifiIfacesD: "Un dispozitiv per placă, pe rând. Niciodată conexiunea serverului la rețea.",
+    parallel: "Sincronizări în paralel", parallelD: "Toate dispozitivele împreună.",
     security: "Securitate", currentPassword: "Parola curentă", newPassword: "Parola nouă", changePassword: "Schimbă parola",
     confirmPassword: "Confirmă parola", signOut: "Deconectare", passwordChanged: "Parola a fost schimbată",
     setupTitle: "Bun venit", setupSub: "Creează parola de administrator pentru acest server Ferry.", setupBtn: "Creează parola",
     loginTitle: "Autentificare", loginSub: "Introdu parola de administrator.", loginBtn: "Intră", mismatch: "Parolele nu coincid.",
     state_idle: "Inactiv", state_syncing: "Sincronizare", state_pairing: "Asociere", s_connecting: "Conectare", s_syncing: "Transfer",
-    loading: "Se încarcă…", idleTitle: "Totul e la zi", idlePaired: "Pornește o cameră în apropiere sau conecteaz-o prin cablu și sincronizarea începe singură.",
-    idleUnpaired: "Conectează o cameră prin USB sau asociaz-o prin Bluetooth.", syncingTitle: "Se sincronizează {n} camere",
-    syncingSub: "{done} din {total} transferate, pe toate camerele.", pairingTitle: "Se asociază o cameră", pairingSub: "Ține camera pornită, în modul de asociere.",
+    loading: "Se încarcă…", idleTitle: "Totul e la zi", idlePaired: "Conectează un dispozitiv sau pornește o cameră asociată în apropiere și sincronizarea începe singură.",
+    idleUnpaired: "Conectează un dispozitiv prin USB sau asociază o cameră prin Bluetooth.", syncingTitle: "Se sincronizează {n} dispozitive",
+    syncingSub: "{done} din {total} transferate, pe toate dispozitivele.", pairingTitle: "Se asociază o cameră", pairingSub: "Ține camera pornită, în modul de asociere.",
     usbOn: "GoPro pe {iface}", noUsb: "Nicio cameră pe USB. Conectează o cameră și pornește-o.", syncingNow: "Se sincronizează",
     standby: "În standby", poweredOn: "Pornită", seen: "{state}, văzută {when}, {rssi} dBm", notSeen: "Încă nevăzută",
-    remove: "Elimină", noPaired: "Nicio cameră asociată încă.", of: "din", deleting: "Se șterg fișierele verificate de pe card",
-    connectingUsb: "Se pregătește transferul pe USB", connectingBle: "Se pornește Wi-Fi-ul camerei prin Bluetooth", listing: "Se citește lista de fișiere",
+    remove: "Elimină", noPaired: "Nicio cameră asociată încă.", of: "din", deleting: "Se șterg fișierele verificate de pe dispozitiv",
+    connectingUsb: "Se pregătește transferul pe USB", connectingBle: "Se pornește Wi-Fi-ul camerei prin Bluetooth", connectingAny: "Conectare la dispozitiv",
+    listing: "Se citește lista de fișiere",
     now: "acum", minAgo: "acum {n} min", saved: "Setările au fost salvate", testOk: "Conexiune reușită: {target}",
     paired: "Asociată", pair: "Asociază", noneFound: "Nicio cameră găsită. Verifică dacă e pornită și în modul de asociere.",
-    pairedToast: "Camera a fost asociată", removedToast: "Camera a fost eliminată", notSet: "nesetat",
-    usbCamera: "Cameră USB", wirelessCamera: "Cameră wireless", wireless: "wireless", nFiles: "{n} fișiere", nothingNew: "Nimic nou",
+    pairedToast: "Camera a fost asociată", removedToast: "Dispozitivul a fost eliminat", notSet: "nesetat",
+    usbCamera: "Dispozitiv USB", wirelessCamera: "Dispozitiv wireless", nFiles: "{n} fișiere", nothingNew: "Nimic nou",
+    mode_usb: "USB", mode_wifi: "wireless", mode_lan: "rețea",
     run_ok: "Reușită", run_failed: "Eșuată", run_running: "În curs", run_cancelled: "Oprită", run_interrupted: "Întreruptă",
     noRuns: "Încă nu există sincronizări.", unreachable: "Serviciul nu răspunde",
     searchingNet: "Se caută în rețea…", hostsFound: "{n} servere găsite", noHosts: "Niciun server de fișiere găsit în rețea.",
-    smbOnly: "Deocamdată doar SMB e suportat ca destinație.", sharesOn: "Share-uri pe {host}", noShares: "Niciun share vizibil cu aceste date.",
+    smbOnly: "Aici se pot alege doar servere SMB.", sharesOn: "Share-uri pe {host}", noShares: "Niciun share vizibil cu aceste date.",
     pickHostFirst: "Introdu sau descoperă întâi un server.", close: "Închide", radio: "placa {r}",
     eyebrow: "Stație de descărcare", secureArea: "Administrare",
-    library: "Bibliotecă", libCount: "{n} fișiere pe {target}", libEmpty: "Pozele și clipurile sincronizate apar aici.", loadMore: "Încarcă mai multe",
+    library: "Bibliotecă", libCount: "{n} fișiere", libEmpty: "Pozele și clipurile sincronizate apar aici.", loadMore: "Încarcă mai multe", all: "Toate",
     refresh: "Reîmprospătează", previous: "Anterior", next: "Următor", download: "Descarcă",
     cantPlay: "Browserul nu poate reda acest clip. Fișierele GoPro HEVC (GX) merg în Safari și în Chrome sau Edge cu decodare hardware.",
+    destinations: "Destinații", credentials: "Credențiale", addCredentials: "Adaugă credențiale", defaultDestination: "Destinația implicită",
+    defaultTag: "Implicită", noDestinations: "Nicio destinație încă. Adaugă NAS-ul sau folderul unde să ajungă fișierele.",
+    noCredentials: "Nicio credențială salvată. Share-urile SMB cer de obicei utilizator și parolă.",
+    syncRules: "Reguli de sincronizare", syncRulesD: "Valori implicite pentru toate dispozitivele. Fiecare furnizor și fiecare dispozitiv le poate suprascrie.",
+    newDestination: "Destinație nouă", editDestination: "Destinație", name: "Nume", type: "Tip",
+    credNone: "Fără (acces guest)", credNew: "Credențiale noi…", newCredentials: "Credențiale noi", editCredentials: "Credențiale",
+    filesGoTo: "Fișierele ajung în", exampleFile: "pentru un fișier făcut pe 26 septembrie 2026",
+    settings: "Setări", providerSettings: "Setări {p}", deviceSettings: "Setări dispozitiv",
+    autoSync: "Sincronizare automată", autoSyncD: "Permite dispozitivelor {p} să pornească singure o sincronizare. Cele manuale merg oricând.",
+    options: "Opțiuni", rulesFor: "Reguli de sincronizare", rulesForProviderD: "Suprascrie regulile globale pentru toate dispozitivele {p}.",
+    rulesForDeviceD: "Suprascrie regulile globale și pe cele {p} doar pentru acest dispozitiv.",
+    override: "Suprascrie", inheritedFrom: "Din {layer}: {value}", layer_global: "regulile globale", layer_provider: "setările {p}",
+    ownCredentials: "cele ale destinației", yes: "Da", no: "Nu", empty: "(gol)",
+    deviceEnabled: "Sincronizează automat acest dispozitiv", deviceEnabledD: "Când e oprit, se sincronizează doar când apeși Sincronizează.",
+    details: "Detalii", forget: "Elimină dispozitivul", otherCameras: "Camere cunoscute", noDevices: "Niciun dispozitiv încă.",
+    lastSeenAs: "Serie {serial}", unsavedChanges: "Salvează întâi",
+    opt_gopro_usb: "Sincronizare automată pe USB", opt_gopro_usb_d: "Pornește când o cameră e conectată prin cablu.",
+    opt_gopro_ble: "Sincronizare automată wireless", opt_gopro_ble_d: "Pornește când o cameră asociată e pornită în apropiere.",
+    opt_gopro_sleep_after_sync: "Standby la final", opt_gopro_sleep_after_sync_d: "Oprește camera după o sincronizare wireless.",
+    opt_gopro_cooldown_minutes: "Pauză wireless", opt_gopro_cooldown_minutes_d: "Minute între două sincronizări wireless ale aceleiași camere.",
   },
 };
 const LOCALES = { en: "en-GB", ro: "ro-RO" };
@@ -629,7 +684,7 @@ let lang = "en";
 try { const saved = localStorage.getItem("ferry.lang") ?? localStorage.getItem("gopro-sync.lang"); if (I18N[saved]) lang = saved; } catch {}
 const t = (key, vars = {}) => (I18N[lang][key] ?? I18N.en[key] ?? key).replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m));
 
-const $ = (s) => document.querySelector(s);
+const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const fmtBytes = (b) => {
   if (!b || b < 0) return "0 B";
@@ -644,6 +699,7 @@ const fmtDur = (s) => {
 };
 const fmtTime = (ts) => new Date(ts * 1000).toLocaleString(LOCALES[lang], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 const ago = (ts) => { const s = Date.now() / 1000 - ts; return s < 60 ? t("now") : s < 3600 ? t("minAgo", { n: Math.floor(s / 60) }) : fmtTime(ts); };
+const modeLabel = (m) => t(`mode_${m}`);
 
 function toast(msg, isError = false) {
   const el = $("#toast");
@@ -656,12 +712,14 @@ async function api(path, opts = {}) {
   const res = await fetch(path, { headers: { "Content-Type": "application/json" }, credentials: "same-origin", ...opts });
   const body = await res.json().catch(() => ({}));
   if (res.status === 401 && !path.startsWith("/api/auth")) { showAuth(); throw new Error(body.detail || "sign in required"); }
-  if (!res.ok) throw new Error(body.detail || res.statusText);
+  if (!res.ok) throw new Error(typeof body.detail === "string" ? body.detail : res.statusText);
   return body;
 }
+const post = (path, body) => api(path, { method: "POST", body: JSON.stringify(body ?? {}) });
 
 let settings = null, status = null, lastRuns = null, authMode = "login", events = null;
 const sessionProgress = {};
+const ui = { scanning: false, found: null };
 
 /* ---------- language ---------- */
 function applyLanguage() {
@@ -672,7 +730,7 @@ function applyLanguage() {
   document.querySelectorAll("[data-lang]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
   renderAuthCopy();
   if (status) renderStatus(status);
-  if (settings) updateTargetHint();
+  if (settings) renderSettings();
   if (lastRuns) renderRuns(lastRuns);
   if (lib.items.length || lib.total) renderLibrary();
 }
@@ -708,10 +766,68 @@ $("#logout").addEventListener("click", async () => { await api("/api/auth/logout
 $("#pw-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   try {
-    await api("/api/auth/password", { method: "POST", body: JSON.stringify({ current: $("#pw-cur").value, password: $("#pw-new").value }) });
+    await post("/api/auth/password", { current: $("#pw-cur").value, password: $("#pw-new").value });
     $("#pw-cur").value = ""; $("#pw-new").value = ""; toast(t("passwordChanged"));
   } catch (err) { toast(err.message, true); }
 });
+
+/* ---------- providers & devices ---------- */
+const providerInfo = (kind) => status?.providers?.find((p) => p.kind === kind) || { kind, label: kind, icon: "ph-device-mobile", options: {} };
+const devicesOf = (kind) => (settings?.devices || []).filter((d) => d.provider === kind);
+const deviceBtn = (d) => `<button type="button" class="btn ghost icon-btn" title="${esc(t("settings"))}" data-edit-device="${esc(d.id)}"><i class="ph ph-gear-six"></i></button>`;
+const syncBtn = (id, mode) => `<button type="button" class="btn sm" data-sync="${esc(id)}" data-mode="${esc(mode)}"><i class="ph ph-arrows-clockwise"></i>${esc(t("sync"))}</button>`;
+const syncingTag = () => `<span class="tag on">${esc(t("syncingNow"))}</span>`;
+
+// Provider-specific blocks of the Devices panel. Providers without one get the generic device list.
+const PROVIDER_UI = {
+  gopro(s) {
+    const active = new Set(s.sessions.map((x) => x.id));
+    const usb = s.usb_cameras.length ? s.usb_cameras.map((c) => `<div class="device"><div class="ico"><i class="ph ph-usb"></i></div>
+        <div class="meta"><div class="name">${esc(t("usbOn", { iface: c.interface }))}</div><div class="sub mono">${esc(c.camera_ip)}</div></div>
+        ${c.syncing ? syncingTag() : syncBtn(c.id, "usb")}</div>`).join("")
+      : `<div class="empty"><i class="ph ph-plug"></i>${esc(t("noUsb"))}</div>`;
+    const cams = devicesOf("gopro");
+    const paired = cams.filter((d) => d.config.address);
+    const pairedHtml = paired.length ? paired.map((c) => {
+      const seen = s.ble_seen?.[c.config.address];
+      const info = seen ? t("seen", { state: seen.powered_on === false ? t("standby") : t("poweredOn"), when: ago(seen.ts), rssi: seen.rssi }) : t("notSeen");
+      return `<div class="device"><div class="ico"><i class="ph ph-bluetooth"></i></div>
+        <div class="meta"><div class="name">${esc(c.name || "GoPro")}${c.enabled ? "" : ` <span class="tag">${esc(t("no"))} auto</span>`}</div><div class="sub">${esc(info)}</div></div>
+        ${active.has(`ble:${c.config.address}`) ? syncingTag() : syncBtn(`ble:${c.config.address}`, "ble")}${deviceBtn(c)}</div>`;
+    }).join("") : `<div class="empty"><i class="ph ph-bluetooth"></i>${esc(t("noPaired"))}</div>`;
+    const others = cams.filter((d) => !d.config.address);
+    const found = ui.found === null ? "" : ui.found === "loading" ? `<div class="skeleton"></div>` : ui.found.length
+      ? ui.found.map((c) => `<div class="device"><div class="ico"><i class="ph ph-broadcast"></i></div>
+          <div class="meta"><div class="name">${esc(c.name || "GoPro")}</div><div class="sub mono">${esc(c.address)}, ${c.rssi} dBm</div></div>
+          ${c.paired ? `<span class="tag">${esc(t("paired"))}</span>` : `<button type="button" class="btn primary sm" data-pair="${esc(c.address)}" data-name="${esc(c.name)}">${esc(t("pair"))}</button>`}</div>`).join("")
+      : `<div class="empty"><i class="ph ph-magnifying-glass"></i>${esc(t("noneFound"))}</div>`;
+    return `<div class="group-label"><i class="ph ph-usb"></i><span>${esc(t("connectedUsb"))}</span></div><div class="devices">${usb}</div>
+      <div class="group-label" style="margin-top: 18px"><i class="ph ph-bluetooth"></i><span>${esc(t("pairedBle"))}</span></div>
+      <div class="devices">${pairedHtml}</div>
+      ${s.ble_available ? `<div style="display: flex; gap: 8px; margin-top: 12px"><button type="button" class="btn sm" data-scan ${ui.scanning ? "disabled" : ""}><i class="ph ph-magnifying-glass"></i>${esc(t("scan"))}</button></div>
+        <div class="devices" style="margin-top: 10px">${found}</div>
+        <div class="hint"><i class="ph ph-info"></i><span>${esc(t("pairHint"))}</span></div>`
+      : `<div class="empty" style="margin-top: 10px"><i class="ph ph-bluetooth-slash"></i>${esc(t("bleLinuxOnly"))}</div>`}
+      ${others.length ? `<div class="group-label" style="margin-top: 18px"><i class="ph ph-video-camera"></i><span>${esc(t("otherCameras"))}</span></div>
+        <div class="devices">${others.map(genericDevice).join("")}</div>` : ""}`;
+  },
+};
+function genericDevice(d) {
+  const serial = d.config.serial ? t("lastSeenAs", { serial: d.config.serial }) : d.id;
+  return `<div class="device"><div class="ico"><i class="ph ${esc(providerInfo(d.provider).icon)}"></i></div>
+    <div class="meta"><div class="name">${esc(d.name || d.id)}</div><div class="sub mono">${esc(serial)}</div></div>${deviceBtn(d)}</div>`;
+}
+function renderProviders(s) {
+  $("#providers").innerHTML = s.providers.map((p) => {
+    const conf = settings?.providers?.[p.kind];
+    const off = conf && conf.enabled === false;
+    const body = PROVIDER_UI[p.kind] ? PROVIDER_UI[p.kind](s)
+      : (devicesOf(p.kind).length ? `<div class="devices">${devicesOf(p.kind).map(genericDevice).join("")}</div>` : `<div class="empty"><i class="ph ${esc(p.icon)}"></i>${esc(t("noDevices"))}</div>`);
+    return `<div class="provider"><div class="provider-head"><div class="ico"><i class="ph ${esc(p.icon)}"></i></div>
+        <div class="meta" style="flex: 1"><div class="name">${esc(p.label)}${off ? ` <span class="tag warn">${esc(t("autoSync"))}: ${esc(t("no"))}</span>` : ""}</div></div>
+        <button type="button" class="btn ghost sm" data-edit-provider="${esc(p.kind)}"><i class="ph ph-gear-six"></i>${esc(t("settings"))}</button></div>${body}</div>`;
+  }).join("");
+}
 
 /* ---------- status ---------- */
 function renderStatus(s) {
@@ -729,22 +845,12 @@ function renderStatus(s) {
     $("#hero-title").textContent = t("pairingTitle"); $("#hero-sub").textContent = t("pairingSub");
   } else {
     $("#hero-title").textContent = t("idleTitle");
-    $("#hero-sub").textContent = settings?.cameras?.length || s.usb_cameras.length ? t("idlePaired") : t("idleUnpaired");
+    $("#hero-sub").textContent = settings?.devices?.length || s.usb_cameras?.length ? t("idlePaired") : t("idleUnpaired");
   }
   renderSessions(s.sessions);
-
-  $("#usb").innerHTML = s.usb_cameras.length ? s.usb_cameras.map((c) => `<div class="device"><div class="ico"><i class="ph ph-usb"></i></div>
-      <div class="meta"><div class="name">${esc(t("usbOn", { iface: c.interface }))}</div><div class="sub mono">${esc(c.camera_ip)}</div></div>
-      ${c.syncing ? `<span class="tag on">${esc(t("syncingNow"))}</span>` : `<button type="button" class="btn sm" data-sync="${esc(c.id)}" data-mode="usb"><i class="ph ph-arrows-clockwise"></i>${esc(t("sync"))}</button>`}</div>`).join("")
-    : `<div class="empty"><i class="ph ph-plug"></i>${esc(t("noUsb"))}</div>`;
-
-  $("#ble-na").hidden = s.ble_available;
-  $("#ble-tools").hidden = !s.ble_available;
-  renderPaired(s);
-
+  renderProviders(s);
   $("#tot-files").textContent = s.totals.files.toLocaleString(LOCALES[lang]);
   $("#tot-bytes").textContent = fmtBytes(s.totals.bytes);
-  $("#sync-all").disabled = !s.usb_cameras.some((c) => !c.syncing) && !(s.ble_available && settings?.cameras?.length);
   $("#cancel-all").hidden = !s.sessions.length;
 }
 
@@ -772,9 +878,9 @@ function renderSessions(list) {
           <div data-now="up" hidden><i class="ph ph-upload-simple"></i><span></span></div></div>`;
       box.appendChild(el);
     }
-    el.querySelector(".ico i").className = `ph ${sess.mode === "usb" ? "ph-usb" : "ph-wifi-high"}`;
+    el.querySelector(".ico i").className = `ph ${sess.mode === "usb" ? "ph-usb" : sess.mode === "wifi" ? "ph-wifi-high" : providerInfo(sess.provider).icon}`;
     el.querySelector(".name").textContent = sess.camera || sess.name;
-    const where = sess.mode === "usb" ? "USB" : `${t("wireless")}${sess.radio ? ", " + t("radio", { r: sess.radio }) : ""}`;
+    const where = sess.mode === "wifi" ? `${modeLabel("wifi")}${sess.radio ? ", " + t("radio", { r: sess.radio }) : ""}` : modeLabel(sess.mode);
     el.querySelector(".sub").textContent = `${t(`s_${sess.state}`)}, ${where}`;
     el.querySelector("[data-cancel]").title = t("stop");
     el.querySelectorAll("[data-k]").forEach((k) => (k.textContent = t(k.dataset.k)));
@@ -794,7 +900,8 @@ function renderSessionProgress(id, p, sess) {
     el.querySelector(".pct").textContent = "";
     const down = el.querySelector('[data-now="down"]');
     down.hidden = false;
-    down.querySelector("span").textContent = p ? t("listing") : t(sess?.mode === "usb" ? "connectingUsb" : "connectingBle");
+    down.querySelector("span").textContent = p ? t("listing")
+      : t(sess?.mode === "usb" && sess?.provider === "gopro" ? "connectingUsb" : sess?.mode === "wifi" ? "connectingBle" : "connectingAny");
     return;
   }
   const pct = p.total_bytes ? Math.min(100, (100 * p.downloaded_bytes) / p.total_bytes) : (p.phase === "done" ? 100 : 0);
@@ -809,73 +916,359 @@ function renderSessionProgress(id, p, sess) {
   up.hidden = !p.current_upload; up.querySelector("span").textContent = p.current_upload || "";
 }
 
-function renderPaired(s) {
-  const cams = settings?.cameras || [];
-  const active = new Set(s.sessions.map((x) => x.id));
-  $("#paired").innerHTML = cams.length ? cams.map((c) => {
-    const seen = s.ble_seen?.[c.address];
-    const info = seen ? t("seen", { state: seen.powered_on === false ? t("standby") : t("poweredOn"), when: ago(seen.ts), rssi: seen.rssi }) : t("notSeen");
-    const syncing = active.has(`ble:${c.address}`);
-    return `<div class="device"><div class="ico"><i class="ph ph-bluetooth"></i></div>
-      <div class="meta"><div class="name">${esc(c.name || "GoPro")}</div><div class="sub">${esc(info)}</div></div>
-      ${syncing ? `<span class="tag on">${esc(t("syncingNow"))}</span>` : `<button type="button" class="btn sm" data-sync="ble:${esc(c.address)}" data-mode="ble"><i class="ph ph-arrows-clockwise"></i>${esc(t("sync"))}</button>`}
-      <button type="button" class="btn ghost icon-btn" title="${esc(t("remove"))}" data-forget="${esc(c.address)}"><i class="ph ph-trash"></i></button></div>`;
-  }).join("") : `<div class="empty"><i class="ph ph-bluetooth"></i>${esc(t("noPaired"))}</div>`;
+/* ---------- paths: the same rules as the server (ferry/core/settings.py) ---------- */
+function sampleFields(providerLabel, deviceName, model) {
+  return { year: "2026", month: "09", day: "26", date: "2026-09-26", provider: providerLabel, device: deviceName || model, model, camera: model };
 }
-
-/* ---------- settings ---------- */
-function fillForm(s) {
-  for (const el of $("#settings").elements) {
-    if (!el.name) continue;
-    const value = el.name.split(".").reduce((o, k) => o?.[k], s);
-    if (el.type === "checkbox") el.checked = !!value;
-    else if (el.type === "radio") el.checked = el.value === value;
-    else el.value = Array.isArray(value) ? value.join(", ") : value ?? "";
+function renderKey(path, tpl, fields, name) {
+  const fill = (s) => (s || "").replace(/\{(\w+)\}/g, (m, k) => (k in fields ? String(fields[k]).replace(/[\/\\]/g, "-") : m));
+  const seg = (s) => fill(s).replace(/\\/g, "/").split("/").filter((p) => p && p !== ".");
+  return [...seg(path), ...seg(tpl), name].join("/");
+}
+function describeDest(dest, key = "") {
+  if (!dest) return t("notSet");
+  if (dest.type === "smb") {
+    const parts = [`\\\\${dest.host || "?"}\\${dest.share || "?"}`, ...(dest.base_path || "").split(/[\/\\]/).filter(Boolean), ...key.split("/").filter(Boolean)];
+    return parts.join("\\");
   }
-  toggleTarget(); updatePreview(); updateTargetHint();
+  if (dest.type === "local") return [dest.path || "?", key].filter(Boolean).join("/");
+  return `${dest.type}:${dest.name || dest.id}/${key}`;
 }
-function readForm() {
-  const out = structuredClone(settings);
-  for (const el of $("#settings").elements) {
-    if (!el.name || (el.type === "radio" && !el.checked)) continue;
-    const keys = el.name.split("."); let o = out;
-    keys.slice(0, -1).forEach((k) => (o = o[k]));
-    const k = keys.at(-1);
-    if (Array.isArray(settings[k])) o[k] = el.value.split(/[\s,]+/).filter(Boolean);
-    else o[k] = el.type === "checkbox" ? el.checked : el.type === "number" ? Number(el.value) : el.value;
+const destById = (id) => settings.destinations.find((d) => d.id === id);
+const credById = (id) => settings.credentials.find((c) => c.id === id);
+const destLabel = (id) => { const d = destById(id); return d ? d.name || d.id : t("notSet"); };
+function previewHtml(policy, fields, file = "GX010474.MP4") {
+  const bad = /\{\w+\}/.exec(renderKey(policy.path, policy.folder_template, fields, ""));
+  if (bad) return { cls: "preview bad", html: `<span>${esc(t("tplHelp"))}</span>` };
+  const key = renderKey(policy.path, policy.folder_template, fields, file);
+  return { cls: "preview", html: `<span class="k">${esc(t("filesGoTo"))}</span><span class="mono">${esc(describeDest(destById(policy.destination), key))}</span>
+    <span class="small muted">${esc(t("exampleFile"))}</span>` };
+}
+function setPreview(el, p) { el.className = p.cls; el.innerHTML = p.html; }
+
+/* ---------- settings: destinations, credentials, global rules ---------- */
+function renderSettings() {
+  const def = settings.defaults.destination;
+  $("#target-hint").textContent = def ? describeDest(destById(def)) : t("notSet");
+  $("#dest-list").innerHTML = settings.destinations.length ? settings.destinations.map((d) => `<div class="device clickable" data-edit-dest="${esc(d.id)}">
+      <div class="ico"><i class="ph ${d.type === "local" ? "ph-folder" : "ph-network"}"></i></div>
+      <div class="meta"><div class="name">${esc(d.name || d.id)}${d.id === def ? ` <span class="tag on">${esc(t("defaultTag"))}</span>` : ""}</div>
+      <div class="sub mono">${esc(describeDest(d))}</div></div><i class="ph ph-caret-right" style="color: var(--faint)"></i></div>`).join("")
+    : `<div class="empty"><i class="ph ph-hard-drives"></i>${esc(t("noDestinations"))}</div>`;
+  $("#cred-list").innerHTML = settings.credentials.length ? settings.credentials.map((c) => `<div class="device clickable" data-edit-cred="${esc(c.id)}">
+      <div class="ico"><i class="ph ph-key"></i></div>
+      <div class="meta"><div class="name">${esc(c.name || c.username || c.id)}</div><div class="sub mono">${esc(c.username || c.key_id || c.account || "")}</div></div>
+      <i class="ph ph-caret-right" style="color: var(--faint)"></i></div>`).join("")
+    : `<div class="empty"><i class="ph ph-key"></i>${esc(t("noCredentials"))}</div>`;
+  const form = $("#rules-form");
+  if (!form.contains(document.activeElement)) {
+    $("#g-destination").innerHTML = `<option value="">${esc(t("notSet"))}</option>` +
+      settings.destinations.map((d) => `<option value="${esc(d.id)}">${esc(d.name || d.id)}</option>`).join("");
+    for (const k of ["destination", "path", "folder_template"]) $(`#g-${k}`).value = settings.defaults[k] ?? "";
+    $("#g-delete_after_sync").checked = !!settings.defaults.delete_after_sync;
+    $("#g-radios").value = settings.wifi_interfaces.join(", ");
+    $("#g-par").value = settings.max_parallel_syncs;
+  }
+  updateGlobalPreview();
+}
+function readGlobal() {
+  return { destination: $("#g-destination").value, path: $("#g-path").value, folder_template: $("#g-folder_template").value,
+           delete_after_sync: $("#g-delete_after_sync").checked };
+}
+function updateGlobalPreview() { setPreview($("#g-preview"), previewHtml(readGlobal(), sampleFields("GoPro", "HERO9", "HERO9 Black"))); }
+$("#rules-form").addEventListener("input", updateGlobalPreview);
+$("#rules-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  try {
+    await saveSettings((s) => {
+      s.defaults = readGlobal();
+      s.wifi_interfaces = $("#g-radios").value.split(/[\s,]+/).filter(Boolean);
+      s.max_parallel_syncs = Number($("#g-par").value) || 1;
+    });
+    toast(t("saved"));
+  } catch (err) { toast(err.message, true); }
+});
+
+async function saveSettings(change) {
+  const draft = structuredClone(settings);
+  change(draft);
+  settings = await api("/api/settings", { method: "PUT", body: JSON.stringify(draft) });
+  renderSettings();
+  if (status) renderStatus(status);
+}
+const slug = (text, taken) => {
+  const base = (text || "item").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "item";
+  let id = base, n = 2;
+  while (taken.includes(id)) id = `${base}-${n++}`;
+  return id;
+};
+
+/* ---------- editor sheet ---------- */
+const editor = { onSave: null };
+function openEditor({ icon, title, body, onSave, onOpen }) {
+  $("#ed-icon").className = `ph ${icon}`;
+  $("#ed-title").textContent = title;
+  // A fresh body per editor, so listeners from the previous one go away with it.
+  const fresh = $("#ed-body").cloneNode(false);
+  $("#ed-body").replaceWith(fresh);
+  fresh.innerHTML = body;
+  editor.onSave = onSave;
+  if (!$("#editor").open) $("#editor").showModal();
+  onOpen?.($("#ed-body"));
+}
+$("#ed-close").addEventListener("click", () => $("#editor").close());
+$("#editor-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = e.submitter; if (btn) btn.disabled = true;
+  try { if (await editor.onSave?.(e.submitter?.dataset.action || "save") !== false) $("#editor").close(); }
+  catch (err) { toast(err.message, true); }
+  if (btn) btn.disabled = false;
+});
+const actions = (left = "", right = "") => `<div class="sheet-actions">${left ? `<div class="left">${left}</div>` : ""}${right}
+  <button type="submit" class="btn primary" data-action="save"><i class="ph ph-check"></i>${esc(t("save"))}</button></div>`;
+const toggleRow = (id, title, desc, checked, risky = false) => `<label class="toggle${risky ? " risky" : ""}"><span class="txt"><div class="t">${esc(title)}</div>
+  ${desc ? `<div class="d">${esc(desc)}</div>` : ""}</span><span class="switch"><input type="checkbox" id="${id}" ${checked ? "checked" : ""}><span></span></span></label>`;
+
+/* Rules editor: every field is inherited from the layer below until "Override" is switched on. */
+const RULES = [
+  { key: "destination", label: "destination", kind: "select" },
+  { key: "credentials", label: "credentials", kind: "select" },
+  { key: "path", label: "folderInDest", kind: "text" },
+  { key: "folder_template", label: "folderLayout", kind: "text" },
+  { key: "delete_after_sync", label: "deleteAfter", kind: "bool" },
+];
+function ruleOptions(key) {
+  return key === "destination"
+    ? settings.destinations.map((d) => `<option value="${esc(d.id)}">${esc(d.name || d.id)}</option>`).join("")
+    : `<option value="">${esc(t("ownCredentials"))}</option>` + settings.credentials.map((c) => `<option value="${esc(c.id)}">${esc(c.name || c.username || c.id)}</option>`).join("");
+}
+function ruleValueText(key, v) {
+  if (key === "destination") return destLabel(v);
+  if (key === "credentials") return v ? (credById(v)?.name || credById(v)?.username || v) : t("ownCredentials");
+  if (key === "delete_after_sync") return t(v ? "yes" : "no");
+  return v === "" ? t("empty") : v;
+}
+function rulesHtml(overrides, inherited, origin, providerLabel) {
+  return `<div class="rules">${RULES.map((r) => {
+    const on = overrides[r.key] !== null && overrides[r.key] !== undefined;
+    const value = on ? overrides[r.key] : inherited[r.key];
+    const layer = origin[r.key] === "provider" ? t("layer_provider", { p: providerLabel }) : t("layer_global");
+    const ctl = r.kind === "select" ? `<select data-rule="${r.key}">${ruleOptions(r.key)}</select>`
+      : r.kind === "bool" ? `<label class="override"><span class="switch sm"><input type="checkbox" data-rule="${r.key}" ${value ? "checked" : ""}><span></span></span>${esc(t("yes"))}</label>`
+      : `<input type="text" class="mono" data-rule="${r.key}" value="${esc(value ?? "")}">`;
+    return `<div class="rule${on ? "" : " inherited"}" data-rule-row="${r.key}"><span class="lbl">${esc(t(r.label))}</span>
+      <label class="override">${esc(t("override"))}<span class="switch sm"><input type="checkbox" data-rule-on="${r.key}" ${on ? "checked" : ""}><span></span></span></label>
+      <div class="inherit">${esc(t("inheritedFrom", { layer, value: "" }))}<b>${esc(ruleValueText(r.key, inherited[r.key]))}</b></div>
+      <div class="ctl">${ctl}</div></div>`;
+  }).join("")}</div><div class="preview" data-rules-preview></div>`;
+}
+function bindRules(root, inherited, fields) {
+  const update = () => {
+    root.querySelectorAll("[data-rule-row]").forEach((row) => row.classList.toggle("inherited", !row.querySelector("[data-rule-on]").checked));
+    setPreview(root.querySelector("[data-rules-preview]"), previewHtml({ ...inherited, ...definedOnly(readRules(root)) }, fields));
+  };
+  root.addEventListener("input", update); root.addEventListener("change", update);
+  update();
+}
+function readRules(root) {
+  const out = {};
+  for (const r of RULES) {
+    if (!root.querySelector(`[data-rule-on="${r.key}"]`).checked) { out[r.key] = null; continue; }
+    const el = root.querySelector(`[data-rule="${r.key}"]`);
+    out[r.key] = r.kind === "bool" ? el.checked : r.key === "credentials" ? (el.value || null) : el.value;
   }
   return out;
 }
-function toggleTarget() {
-  const target = $("#settings").querySelector("input[name=target]:checked")?.value || "smb";
-  document.querySelectorAll("[data-for]").forEach((el) => (el.hidden = el.dataset.for !== target));
+const definedOnly = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== null && v !== undefined));
+function layered(kind, providerSync) {
+  // Values and origins of the global + provider layers, as a device inherits them.
+  const values = { ...settings.defaults, credentials: null }, origin = Object.fromEntries(RULES.map((r) => [r.key, "global"]));
+  for (const [k, v] of Object.entries(providerSync || settings.providers?.[kind]?.sync || {})) if (v !== null && v !== undefined) { values[k] = v; origin[k] = "provider"; }
+  return { values, origin };
 }
-function updatePreview() {
-  const out = ($("#f-tpl").value || "").replace("{year}", "2026").replace("{month}", "09").replace("{day}", "26")
-    .replace("{date}", "2026-09-26").replace("{camera}", "HERO9 Black").replace(/^\/+|\/+$/g, "");
-  $("#tpl-preview").textContent = `${out ? out + "/" : ""}GX010474.MP4`;
-}
-function updateTargetHint() {
-  const smb = settings.smb;
-  $("#target-hint").textContent = settings.target === "smb"
-    ? (smb.host ? `\\\\${smb.host}\\${smb.share}${smb.base_path ? "\\" + smb.base_path : ""}` : t("notSet"))
-    : settings.local_path || t("notSet");
-}
-async function saveSettings(quiet = false) {
-  settings = await api("/api/settings", { method: "PUT", body: JSON.stringify(readForm()) });
-  fillForm(settings);
-  if (!quiet) toast(t("saved"));
+function setRuleSelects(root, overrides, inherited) {
+  RULES.filter((r) => r.kind === "select").forEach((r) => {
+    const on = overrides[r.key] !== null && overrides[r.key] !== undefined;
+    root.querySelector(`[data-rule="${r.key}"]`).value = (on ? overrides[r.key] : inherited[r.key]) ?? "";
+  });
 }
 
-/* ---------- discovery ---------- */
-$("#discover").addEventListener("click", async (e) => {
-  const b = e.currentTarget, box = $("#hosts");
-  b.disabled = true; box.hidden = false;
+function openProviderEditor(kind) {
+  const p = providerInfo(kind);
+  const conf = settings.providers?.[kind] || { enabled: true, sync: {}, options: {} };
+  const opts = { ...p.options, ...(conf.options || {}) };
+  const optRows = Object.entries(p.options).map(([k, def]) => typeof def === "boolean"
+    ? toggleRow(`opt-${k}`, t(`opt_${kind}_${k}`), t(`opt_${kind}_${k}_d`), opts[k])
+    : `<div class="field" style="padding: 12px 0; border-top: 1px solid var(--line)"><label for="opt-${k}">${esc(t(`opt_${kind}_${k}`))}</label>
+        <input type="${typeof def === "number" ? "number" : "text"}" id="opt-${k}" value="${esc(opts[k])}"><div class="help">${esc(t(`opt_${kind}_${k}_d`))}</div></div>`).join("");
+  const inherited = { ...settings.defaults, credentials: null };
+  const origin = Object.fromEntries(RULES.map((r) => [r.key, "global"]));
+  const sync = conf.sync || {};
+  openEditor({
+    icon: p.icon, title: t("providerSettings", { p: p.label }),
+    body: `<div class="toggles">${toggleRow("prov-enabled", t("autoSync"), t("autoSyncD", { p: p.label }), conf.enabled !== false)}${optRows}</div>
+      <div class="section-label">${esc(t("rulesFor"))}</div><p class="small muted" style="margin: 0 0 8px">${esc(t("rulesForProviderD", { p: p.label }))}</p>
+      <div id="prov-rules">${rulesHtml(sync, inherited, origin, p.label)}</div>${actions()}`,
+    onOpen: (root) => { const r = $("#prov-rules", root); setRuleSelects(r, sync, inherited); bindRules(r, inherited, sampleFields(p.label, "", p.label)); },
+    onSave: async () => {
+      const options = {};
+      for (const [k, def] of Object.entries(p.options)) {
+        const el = $(`#opt-${k}`);
+        options[k] = typeof def === "boolean" ? el.checked : typeof def === "number" ? Number(el.value) : el.value;
+      }
+      await saveSettings((s) => {
+        s.providers[kind] = { ...(s.providers[kind] || {}), enabled: $("#prov-enabled").checked, options, sync: readRules($("#prov-rules")) };
+      });
+      toast(t("saved"));
+    },
+  });
+}
+
+function openDeviceEditor(id) {
+  const d = settings.devices.find((x) => x.id === id); if (!d) return;
+  const p = providerInfo(d.provider);
+  const { values: inherited, origin } = layered(d.provider);
+  const details = Object.entries(d.config).map(([k, v]) => `<div class="small"><span class="muted">${esc(k)}:</span> <span class="mono">${esc(v)}</span></div>`).join("");
+  const model = d.config.model || p.label;
+  openEditor({
+    icon: p.icon, title: d.name || t("deviceSettings"),
+    body: `<div class="fields"><div class="field full"><label for="dev-name">${esc(t("name"))}</label><input type="text" id="dev-name" value="${esc(d.name)}"></div></div>
+      <div class="toggles" style="margin-top: 10px">${toggleRow("dev-enabled", t("deviceEnabled"), t("deviceEnabledD"), d.enabled)}</div>
+      <div class="section-label">${esc(t("rulesFor"))}</div><p class="small muted" style="margin: 0 0 8px">${esc(t("rulesForDeviceD", { p: p.label }))}</p>
+      <div id="dev-rules">${rulesHtml(d.sync, inherited, origin, p.label)}</div>
+      ${details ? `<div class="section-label">${esc(t("details"))}</div><div style="display: grid; gap: 4px">${details}</div>` : ""}
+      ${actions(`<button type="submit" class="btn ghost danger" data-action="delete" formnovalidate><i class="ph ph-trash"></i>${esc(t("forget"))}</button>`)}`,
+    onOpen: (root) => {
+      const r = $("#dev-rules", root); setRuleSelects(r, d.sync, inherited);
+      const fields = () => sampleFields(p.label, $("#dev-name").value, model);
+      bindRules(r, inherited, fields());
+      $("#dev-name").addEventListener("input", () => setPreview($("[data-rules-preview]", r), previewHtml({ ...inherited, ...definedOnly(readRules(r)) }, fields())));
+    },
+    onSave: async (action) => {
+      if (action === "delete") {
+        settings = await api(`/api/devices/${encodeURIComponent(id)}`, { method: "DELETE" });
+        toast(t("removedToast"));
+      } else {
+        settings = await api(`/api/devices/${encodeURIComponent(id)}`, { method: "PUT",
+          body: JSON.stringify({ name: $("#dev-name").value, enabled: $("#dev-enabled").checked, sync: readRules($("#dev-rules")) }) });
+        toast(t("saved"));
+      }
+      renderSettings(); if (status) renderStatus(status);
+    },
+  });
+}
+
+// Destination types the editor offers; cloud ones join this list.
+const DEST_TYPES = [
+  { type: "smb", icon: "ph-network", label: "networkShare" },
+  { type: "local", icon: "ph-folder", label: "localFolder" },
+];
+function credSelect(id, value, allowNew) {
+  return `<select id="${id}"><option value="">${esc(t("credNone"))}</option>` +
+    settings.credentials.filter((c) => c.kind === "password").map((c) => `<option value="${esc(c.id)}" ${c.id === value ? "selected" : ""}>${esc(c.name || c.username || c.id)}</option>`).join("") +
+    (allowNew ? `<option value="__new">${esc(t("credNew"))}</option>` : "") + `</select>`;
+}
+function openDestEditor(id) {
+  const existing = id ? destById(id) : null;
+  const d = existing ? structuredClone(existing) : { id: "", name: "", type: "smb", host: "", share: "", base_path: "", path: "", credentials: null };
+  const typeSeg = DEST_TYPES.map((x) => `<input type="radio" name="dest-type" value="${x.type}" id="dt-${x.type}" ${x.type === d.type ? "checked" : ""}>
+    <label for="dt-${x.type}"><i class="ph ${x.icon}"></i><span>${esc(t(x.label))}</span></label>`).join("");
+  openEditor({
+    icon: "ph-hard-drives", title: existing ? existing.name || existing.id : t("newDestination"),
+    body: `<div class="seg" style="margin-bottom: 16px">${typeSeg}</div>
+      <div class="fields">
+        <div class="field full"><label for="d-name">${esc(t("name"))}</label><input type="text" id="d-name" value="${esc(d.name)}" placeholder="Synology"></div>
+      </div>
+      <div class="fields" data-dest-for="smb" style="margin-top: 16px">
+        <div class="field full"><label for="d-host">${esc(t("server"))}</label>
+          <div class="with-btn"><input type="text" id="d-host" value="${esc(d.host)}" placeholder="nas.local">
+            <button type="button" class="btn" data-discover><i class="ph ph-binoculars"></i>${esc(t("discover"))}</button></div>
+          <div class="picker" id="d-hosts" hidden></div></div>
+        <div class="field full"><label for="d-cred">${esc(t("credentials"))}</label>${credSelect("d-cred", d.credentials, true)}</div>
+        <div class="field" data-new-cred hidden><label for="d-user">${esc(t("username"))}</label><input type="text" id="d-user"></div>
+        <div class="field" data-new-cred hidden><label for="d-pass">${esc(t("password"))}</label><input type="password" id="d-pass" autocomplete="new-password"></div>
+        <div class="field full"><label for="d-share">${esc(t("share"))}</label>
+          <div class="with-btn"><input type="text" id="d-share" value="${esc(d.share)}">
+            <button type="button" class="btn" data-browse><i class="ph ph-folders"></i>${esc(t("browse"))}</button></div>
+          <div class="picker" id="d-shares" hidden></div></div>
+        <div class="field full"><label for="d-base">${esc(t("subfolder"))}</label><input type="text" id="d-base" value="${esc(d.base_path)}" placeholder="${esc(t("optional"))}"></div>
+      </div>
+      <div class="fields" data-dest-for="local" style="margin-top: 16px">
+        <div class="field full"><label for="d-path">${esc(t("path"))}</label><input type="text" id="d-path" value="${esc(d.path)}" placeholder="/data/library">
+          <div class="help">${esc(t("localHelp"))}</div></div>
+      </div>
+      ${actions(existing ? `<button type="submit" class="btn ghost danger" data-action="delete"><i class="ph ph-trash"></i>${esc(t("delete"))}</button>` : "",
+        `<button type="submit" class="btn" data-action="test"><i class="ph ph-plugs-connected"></i>${esc(t("test"))}</button>`)}`,
+    onOpen: (root) => {
+      const sync = () => {
+        const type = $("input[name=dest-type]:checked", root).value;
+        root.querySelectorAll("[data-dest-for]").forEach((el) => (el.hidden = el.dataset.destFor !== type));
+        root.querySelectorAll("[data-new-cred]").forEach((el) => (el.hidden = $("#d-cred").value !== "__new"));
+      };
+      root.addEventListener("change", sync); sync();
+    },
+    onSave: async (action) => {
+      if (action === "delete") {
+        await saveSettings((s) => { s.destinations = s.destinations.filter((x) => x.id !== id); if (s.defaults.destination === id) s.defaults.destination = ""; });
+        toast(t("deleted")); return;
+      }
+      const type = $("input[name=dest-type]:checked").value;
+      let credId = $("#d-cred").value || null, newCred = null;
+      const host = $("#d-host").value.trim();
+      if (type === "smb" && credId === "__new") {
+        const user = $("#d-user").value.trim();
+        credId = slug(`${user}-${host}`, settings.credentials.map((c) => c.id));
+        newCred = { id: credId, name: `${user}@${host}`, kind: "password", username: user, password: $("#d-pass").value };
+      }
+      const destId = existing ? existing.id : slug($("#d-name").value || host || type, settings.destinations.map((x) => x.id));
+      const next = { ...d, id: destId, type, name: $("#d-name").value.trim() || host || $("#d-path").value.trim(),
+        host, share: $("#d-share").value.trim(), base_path: $("#d-base").value.trim(), path: $("#d-path").value.trim(),
+        credentials: type === "smb" ? credId : null };
+      await saveSettings((s) => {
+        if (newCred) s.credentials.push(newCred);
+        s.destinations = existing ? s.destinations.map((x) => (x.id === destId ? next : x)) : [...s.destinations, next];
+        if (!s.defaults.destination) s.defaults.destination = destId;
+      });
+      if (action === "test") {
+        const r = await post(`/api/destinations/${encodeURIComponent(destId)}/test`);
+        toast(t("testOk", { target: r.target }));
+        openDestEditor(destId);
+        return false;
+      }
+      toast(t("saved"));
+    },
+  });
+}
+
+function openCredEditor(id) {
+  const c = id ? credById(id) : { id: "", name: "", kind: "password", username: "", password: "" };
+  openEditor({
+    icon: "ph-key", title: id ? c.name || c.username || c.id : t("newCredentials"),
+    body: `<div class="fields">
+        <div class="field full"><label for="c-name">${esc(t("name"))}</label><input type="text" id="c-name" value="${esc(c.name)}"></div>
+        <div class="field"><label for="c-user">${esc(t("username"))}</label><input type="text" id="c-user" value="${esc(c.username)}"></div>
+        <div class="field"><label for="c-pass">${esc(t("password"))}</label><input type="password" id="c-pass" value="${esc(c.password)}" autocomplete="new-password"></div>
+      </div>${actions(id ? `<button type="submit" class="btn ghost danger" data-action="delete"><i class="ph ph-trash"></i>${esc(t("delete"))}</button>` : "")}`,
+    onSave: async (action) => {
+      if (action === "delete") { await saveSettings((s) => { s.credentials = s.credentials.filter((x) => x.id !== id); }); toast(t("deleted")); return; }
+      const user = $("#c-user").value.trim();
+      const next = { ...c, id: id || slug($("#c-name").value || user, settings.credentials.map((x) => x.id)),
+        name: $("#c-name").value.trim() || user, username: user, password: $("#c-pass").value };
+      await saveSettings((s) => { s.credentials = id ? s.credentials.map((x) => (x.id === id ? next : x)) : [...s.credentials, next]; });
+      toast(t("saved"));
+    },
+  });
+}
+
+/* ---------- network discovery (destination editor) ---------- */
+async function discoverHosts(btn) {
+  const box = $("#d-hosts");
+  btn.disabled = true; box.hidden = false;
   box.innerHTML = `<div class="picker-head"><span>${esc(t("searchingNet"))}</span></div><div class="skeleton" style="height: 48px"></div>`;
   try {
     const hosts = await api("/api/discover/hosts");
     box.innerHTML = `<div class="picker-head"><span>${esc(hosts.length ? t("hostsFound", { n: hosts.length }) : t("noHosts"))}</span>
-      <button type="button" class="btn ghost sm" data-close="hosts">${esc(t("close"))}</button></div>` +
+      <button type="button" class="btn ghost sm" data-close="d-hosts">${esc(t("close"))}</button></div>` +
       hosts.map((h) => {
         const smb = h.services.includes("smb");
         return `<div class="device${smb ? " clickable" : ""}" ${smb ? `data-host="${esc(h.name && !h.name.includes(" ") ? h.name : h.address)}"` : `title="${esc(t("smbOnly"))}"`}>
@@ -884,25 +1277,26 @@ $("#discover").addEventListener("click", async (e) => {
           <div>${h.services.map((sv) => `<span class="tag${sv === "smb" ? " on" : ""}">${esc(sv.toUpperCase())}</span>`).join("")}</div></div>`;
       }).join("");
   } catch (err) { box.hidden = true; toast(err.message, true); }
-  b.disabled = false;
-});
-$("#browse").addEventListener("click", async (e) => {
-  const host = $("#f-host").value.trim();
+  btn.disabled = false;
+}
+async function browseShares(btn) {
+  const host = $("#d-host").value.trim();
   if (!host) { toast(t("pickHostFirst"), true); return; }
-  const b = e.currentTarget, box = $("#shares");
-  b.disabled = true; box.hidden = false;
+  const box = $("#d-shares"), cred = $("#d-cred").value;
+  btn.disabled = true; box.hidden = false;
   box.innerHTML = `<div class="skeleton" style="height: 48px"></div>`;
+  const body = cred === "__new" ? { host, username: $("#d-user").value, password: $("#d-pass").value }
+    : cred ? { host, credentials: cred } : { host, username: "", password: "" };
   try {
-    const shares = await api("/api/discover/shares", { method: "POST",
-      body: JSON.stringify({ host, username: $("#f-user").value, password: $("#f-pass").value }) });
+    const shares = await post("/api/discover/shares", body);
     box.innerHTML = `<div class="picker-head"><span>${esc(t("sharesOn", { host }))}</span>
-      <button type="button" class="btn ghost sm" data-close="shares">${esc(t("close"))}</button></div>` +
+      <button type="button" class="btn ghost sm" data-close="d-shares">${esc(t("close"))}</button></div>` +
       (shares.length ? shares.map((sh) => `<div class="device clickable" data-share="${esc(sh.name)}"><div class="ico"><i class="ph ph-folder-simple"></i></div>
         <div class="meta"><div class="name">${esc(sh.name)}</div><div class="sub">${esc(sh.comment || "")}</div></div></div>`).join("")
         : `<div class="empty"><i class="ph ph-folder-dashed"></i>${esc(t("noShares"))}</div>`);
   } catch (err) { box.hidden = true; toast(err.message, true); }
-  b.disabled = false;
-});
+  btn.disabled = false;
+}
 
 /* ---------- history & log ---------- */
 const RUN_ICON = { ok: ["ok", "ph-check"], failed: ["failed", "ph-x"], running: ["running", "ph-arrows-clockwise"] };
@@ -911,9 +1305,10 @@ function renderRuns(runs) {
   $("#tab-runs").innerHTML = runs.length ? runs.map((r) => {
     const [cls, icon] = RUN_ICON[r.status] || ["other", "ph-pause"];
     const what = r.status === "ok" ? (r.files ? t("nFiles", { n: r.files }) : t("nothingNew")) : t(`run_${r.status}`);
+    const via = [r.provider ? providerInfo(r.provider).label : "", modeLabel(r.mode)].filter(Boolean).join(", ");
     return `<div class="run" title="${esc(r.error || "")}"><div class="badge ${cls}"><i class="ph ${icon}"></i></div>
-      <div style="min-width: 0"><div class="title">${esc(r.camera || (r.mode === "usb" ? t("usbCamera") : t("wirelessCamera")))}</div>
-      <div class="sub">${fmtTime(r.started_at)}, ${r.mode === "usb" ? "USB" : t("wireless")}${r.error ? `, ${esc(r.error)}` : ""}</div></div>
+      <div style="min-width: 0"><div class="title">${esc(r.camera || (r.mode === "wifi" ? t("wirelessCamera") : t("usbCamera")))}</div>
+      <div class="sub">${fmtTime(r.started_at)}, ${esc(via)}${r.error ? `, ${esc(r.error)}` : ""}</div></div>
       <div class="right"><div class="v num">${r.bytes ? fmtBytes(r.bytes) : ""}</div><div class="sub">${esc(what)}</div></div></div>`;
   }).join("") : `<div class="empty"><i class="ph ph-clock"></i>${esc(t("noRuns"))}</div>`;
 }
@@ -928,6 +1323,7 @@ function addLog(e) {
   if (atBottom) log.scrollTop = log.scrollHeight;
 }
 
+let refreshTimer = null;
 function connectEvents() {
   events = new EventSource("/api/events");
   events.onmessage = (msg) => {
@@ -940,7 +1336,15 @@ function connectEvents() {
       renderSessionProgress(e.session, e.progress, status?.sessions.find((s) => s.id === e.session));
       libraryNoticeProgress(e.session, e.progress);
       if (status) renderStatus(status);
-    } else if (e.type === "log") addLog(e);
+    } else if (e.type === "log") {
+      addLog(e);
+      // Watchers register devices and pairing changes settings; pick that up quietly.
+      clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(async () => {
+        if ($("#editor").open) return;
+        try { settings = await api("/api/settings"); renderSettings(); if (status) renderStatus(status); } catch {}
+      }, 1500);
+    }
   };
 }
 
@@ -950,16 +1354,6 @@ document.querySelectorAll("[data-lang]").forEach((b) => b.addEventListener("clic
   try { localStorage.setItem("ferry.lang", lang); } catch {}
   applyLanguage();
 }));
-$("#settings").addEventListener("change", (e) => { if (e.target.name === "target") toggleTarget(); });
-$("#f-tpl").addEventListener("input", updatePreview);
-$("#settings").addEventListener("submit", async (e) => { e.preventDefault(); try { await saveSettings(); } catch (err) { toast(err.message, true); } });
-$("#test").addEventListener("click", async (e) => {
-  const b = e.currentTarget; b.disabled = true;
-  try { await saveSettings(true); const r = await api("/api/target/test", { method: "POST" }); toast(t("testOk", { target: r.target })); }
-  catch (err) { toast(err.message, true); }
-  b.disabled = false;
-});
-const post = (path, body) => api(path, { method: "POST", body: JSON.stringify(body) });
 $("#sync-all").addEventListener("click", async () => { try { toast((await post("/api/sync", { mode: "all" })).message); } catch (err) { toast(err.message, true); } });
 $("#cancel-all").addEventListener("click", () => post("/api/sync/cancel", {}).catch((err) => toast(err.message, true)));
 document.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => {
@@ -967,53 +1361,61 @@ document.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click
   $("#tab-runs").hidden = b.dataset.tab !== "runs"; $("#tab-log").hidden = b.dataset.tab !== "log";
   if (b.dataset.tab === "log") $("#log").scrollTop = $("#log").scrollHeight;
 }));
-$("#scan").addEventListener("click", async (e) => {
-  const b = e.currentTarget; b.disabled = true;
-  $("#found").innerHTML = `<div class="skeleton"></div>`;
-  try {
-    const found = await api("/api/ble/scan");
-    $("#found").innerHTML = found.length ? found.map((c) => `<div class="device"><div class="ico"><i class="ph ph-broadcast"></i></div>
-      <div class="meta"><div class="name">${esc(c.name || "GoPro")}</div><div class="sub mono">${esc(c.address)}, ${c.rssi} dBm</div></div>
-      ${c.paired ? `<span class="tag">${esc(t("paired"))}</span>` : `<button type="button" class="btn primary sm" data-pair="${esc(c.address)}" data-name="${esc(c.name)}">${esc(t("pair"))}</button>`}</div>`).join("")
-      : `<div class="empty"><i class="ph ph-magnifying-glass"></i>${esc(t("noneFound"))}</div>`;
-  } catch (err) { $("#found").innerHTML = ""; toast(err.message, true); }
-  b.disabled = false;
-});
+async function scanBle() {
+  ui.scanning = true; ui.found = "loading"; renderStatus(status);
+  try { ui.found = await api("/api/ble/scan"); }
+  catch (err) { ui.found = null; toast(err.message, true); }
+  ui.scanning = false; renderStatus(status);
+}
 document.addEventListener("click", async (e) => {
-  const el = e.target.closest("[data-pair],[data-forget],[data-sync],[data-cancel],[data-host],[data-share],[data-close]");
+  const el = e.target.closest("[data-pair],[data-sync],[data-cancel],[data-host],[data-share],[data-close],[data-scan],[data-discover],[data-browse],[data-edit-dest],[data-edit-cred],[data-edit-provider],[data-edit-device]");
   if (!el) return;
   const d = el.dataset;
   if (d.close) { $(`#${d.close}`).hidden = true; return; }
-  if (d.host) { $("#f-host").value = d.host; $("#hosts").hidden = true; $("#f-user").focus(); return; }
-  if (d.share) { $("#f-share").value = d.share; $("#shares").hidden = true; return; }
+  if (d.host) { $("#d-host").value = d.host; $("#d-hosts").hidden = true; $("#d-cred").focus(); return; }
+  if (d.share) { $("#d-share").value = d.share; $("#d-shares").hidden = true; return; }
+  if ("scan" in d) { scanBle(); return; }
+  if ("discover" in d) { discoverHosts(el); return; }
+  if ("browse" in d) { browseShares(el); return; }
+  if ("editDest" in d) { openDestEditor(d.editDest); return; }
+  if ("editCred" in d) { openCredEditor(d.editCred); return; }
+  if (d.editProvider) { openProviderEditor(d.editProvider); return; }
+  if (d.editDevice) { openDeviceEditor(d.editDevice); return; }
   try {
     el.disabled = true;
     if (d.sync) { toast((await post("/api/sync", { mode: d.mode, camera: d.sync })).message); }
     else if (d.cancel) { await post("/api/sync/cancel", { session: d.cancel }); }
-    else if (d.pair) { await post("/api/ble/pair", { address: d.pair, name: d.name }); toast(t("pairedToast")); $("#found").innerHTML = ""; }
-    else if (d.forget) { await api(`/api/ble/cameras/${encodeURIComponent(d.forget)}`, { method: "DELETE" }); toast(t("removedToast")); }
-    if (d.pair || d.forget) { settings = await api("/api/settings"); renderStatus(await api("/api/status")); }
+    else if (d.pair) {
+      await post("/api/ble/pair", { address: d.pair, name: d.name }); toast(t("pairedToast")); ui.found = null;
+      settings = await api("/api/settings"); renderSettings(); renderStatus(await api("/api/status"));
+    }
   } catch (err) { toast(err.message, true); }
   el.disabled = false;
 });
 
 /* ---------- library ---------- */
-const lib = { items: [], total: 0, index: -1 };
-const VIDEO_EXT = /\.(mp4|mov)$/i;
-// Capture times are camera wall-clock values stored as epochs, so format them as UTC.
+const lib = { items: [], total: 0, index: -1, provider: "", providers: [] };
+const VIDEO_EXT = /\.(mp4|mov|avi)$/i;
+// Capture times are device wall-clock values stored as epochs, so format them as UTC.
 const fmtDay = (ts) => new Date(ts * 1000).toLocaleDateString(LOCALES[lang], { timeZone: "UTC", weekday: "short", day: "numeric", month: "long", year: "numeric" });
 const fmtClock = (ts) => new Date(ts * 1000).toLocaleTimeString(LOCALES[lang], { timeZone: "UTC", hour: "2-digit", minute: "2-digit" });
 const mediaUrl = (it, dl) => `/api/library/${it.id}/media${dl ? "?download=true" : ""}`;
 
 async function loadLibrary(reset = true) {
-  const r = await api(`/api/library?offset=${reset ? 0 : lib.items.length}&limit=60`);
+  const q = new URLSearchParams({ offset: reset ? 0 : lib.items.length, limit: 60 });
+  if (lib.provider) q.set("provider", lib.provider);
+  const r = await api(`/api/library?${q}`);
   lib.items = reset ? r.items : lib.items.concat(r.items);
-  lib.total = r.total;
+  lib.total = r.total; lib.providers = r.providers || [];
   renderLibrary();
 }
 function renderLibrary() {
-  $("#lib-meta").textContent = lib.total ? t("libCount", { n: lib.total.toLocaleString(LOCALES[lang]), target: settings ? targetLabel() : "" }) : "";
+  $("#lib-meta").textContent = lib.total ? t("libCount", { n: lib.total.toLocaleString(LOCALES[lang]) }) : "";
   $("#lib-more").hidden = lib.items.length >= lib.total;
+  const filter = $("#lib-filter");
+  filter.hidden = lib.providers.length < 2 && !lib.provider;
+  filter.innerHTML = [["", t("all")], ...lib.providers.map((k) => [k, providerInfo(k).label])]
+    .map(([k, label]) => `<button type="button" data-lib-provider="${esc(k)}" aria-pressed="${k === lib.provider}">${esc(label)}</button>`).join("");
   if (!lib.items.length) { $("#lib-body").innerHTML = `<div class="empty"><i class="ph ph-images"></i>${esc(t("libEmpty"))}</div>`; return; }
   const days = [];
   lib.items.forEach((it, i) => {
@@ -1028,9 +1430,10 @@ function renderLibrary() {
       <span class="cap"><span>${esc(it.name)}</span><span>${esc(fmtBytes(it.size))}</span></span></button>`).join("")
   }</div></div>`).join("");
 }
-function targetLabel() {
-  return settings.target === "local" ? settings.local_path : `${settings.smb.host}/${settings.smb.share}${settings.smb.base_path ? "/" + settings.smb.base_path : ""}`;
-}
+$("#lib-filter").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-lib-provider]"); if (!b) return;
+  lib.provider = b.dataset.libProvider; loadLibrary().catch((err) => toast(err.message, true));
+});
 function openViewer(i) {
   const it = lib.items[i]; if (!it) return;
   lib.index = i;
@@ -1101,8 +1504,9 @@ async function startApp() {
   $("#auth").hidden = true; $("#app").hidden = false;
   $("#hero-title").textContent = t("loading");
   try {
-    settings = await api("/api/settings"); fillForm(settings);
+    settings = await api("/api/settings");
     renderStatus(await api("/api/status"));
+    renderSettings();
     $("#log").innerHTML = ""; (await api("/api/logs")).forEach(addLog);
     await loadRuns();
     loadLibrary().catch((err) => { $("#lib-body").innerHTML = `<div class="empty"><i class="ph ph-warning-circle"></i>${esc(err.message)}</div>`; });

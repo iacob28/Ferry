@@ -10,14 +10,14 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from . import __version__
 from .auth import COOKIE, SESSION_TTL, AuthStore
 from .core.engine import thumb_name
 from .core.service import SyncService
-from .core.settings import Settings
-from .destinations import DestinationError, make_destination
+from .core.settings import SECRET_KEYS, VERSION, Settings, SyncOverrides, template_fields
+from .destinations import DestinationError, resolve_destination
 
 STATIC = Path(__file__).parent / "static"
 MASK = "********"
@@ -50,6 +50,22 @@ class SharesRequest(BaseModel):
     host: str
     username: str | None = None
     password: str | None = None
+    # Saved credentials to fall back on for fields the form leaves empty or masked.
+    credentials: str | None = None
+
+
+class DeviceUpdate(BaseModel):
+    name: str | None = None
+    enabled: bool | None = None
+    sync: SyncOverrides | None = None
+    config: dict | None = None
+
+
+class DeviceCreate(BaseModel):
+    provider: str
+    name: str = ""
+    config: dict = {}
+    sync: SyncOverrides = SyncOverrides()
 
 
 def _byte_range(header: str | None, size: int) -> tuple[int, int] | None:
@@ -67,18 +83,49 @@ def _byte_range(header: str | None, size: int) -> tuple[int, int] | None:
     return start, end
 
 
+def _invalid(exc: ValueError) -> HTTPException:
+    """422 with a short message: 'defaults.folder_template: unknown placeholder {oops}; ...'."""
+    if isinstance(exc, ValidationError):
+        parts = []
+        for err in exc.errors():
+            where = ".".join(str(x) for x in err["loc"])
+            msg = err["msg"].removeprefix("Value error, ")
+            parts.append(f"{where}: {msg}" if where else msg)
+        return HTTPException(422, "; ".join(parts))
+    return HTTPException(422, str(exc))
+
+
+def _mask(obj: dict) -> dict:
+    for key in SECRET_KEYS & obj.keys():
+        if obj[key]:
+            obj[key] = MASK
+    return obj
+
+
+def _unmask(incoming: dict, current: dict | None) -> dict:
+    """Puts back the stored secret wherever the client sent the mask (or nothing)."""
+    for key in SECRET_KEYS:
+        if incoming.get(key, MASK) == MASK:
+            incoming[key] = (current or {}).get(key, "")
+    return incoming
+
+
 def _public(settings: Settings) -> dict:
     data = settings.model_dump()
-    data["smb"]["password"] = MASK if settings.smb.password else ""
+    for cred in data["credentials"]:
+        _mask(cred)
+    for device in data["devices"]:
+        _mask(device["config"])
     return data
 
 
 def _merge(current: Settings, incoming: dict) -> Settings:
-    password = incoming.get("smb", {}).get("password")
-    if password in (None, MASK):
-        incoming.setdefault("smb", {})["password"] = current.smb.password
-    # Paired cameras are managed by the pairing endpoints only.
-    incoming["cameras"] = [c.model_dump() for c in current.cameras]
+    incoming = dict(incoming)
+    saved = {c.id: c.model_dump() for c in current.credentials}
+    incoming["credentials"] = [_unmask(dict(c), saved.get(c.get("id"))) for c in incoming.get("credentials", [])]
+    # Devices are managed through /api/devices, so a stale form cannot drop one a watcher just added.
+    incoming["devices"] = [d.model_dump() for d in current.devices]
+    incoming["version"] = VERSION
     return Settings.model_validate(incoming)
 
 
@@ -130,7 +177,7 @@ def create_app(service: SyncService, auth: AuthStore) -> FastAPI:
         try:
             auth.set_password(req.password)
         except ValueError as exc:
-            raise HTTPException(422, str(exc))
+            raise _invalid(exc)
         _sign_in(request, response)
         service.log("info", "admin password created")
         return {"ok": True}
@@ -155,7 +202,7 @@ def create_app(service: SyncService, auth: AuthStore) -> FastAPI:
         try:
             auth.set_password(req.password)
         except ValueError as exc:
-            raise HTTPException(422, str(exc))
+            raise _invalid(exc)
         _sign_in(request, response)
         return {"ok": True}
 
@@ -174,19 +221,104 @@ def create_app(service: SyncService, auth: AuthStore) -> FastAPI:
         try:
             settings = _merge(service.settings, payload)
         except ValueError as exc:
-            raise HTTPException(422, str(exc))
+            raise _invalid(exc)
         service.settings_store.save(settings)
         service.log("info", "settings saved")
         return _public(settings)
 
-    @app.post("/api/target/test")
-    async def test_target():
+    async def _test_destination(dest_id: str | None, credentials: str | None = None) -> dict:
         try:
-            target = make_destination(service.settings)
+            target = resolve_destination(service.settings, dest_id, credentials)
             await target.test()
         except Exception as exc:
             raise HTTPException(400, f"{type(exc).__name__}: {exc}")
         return {"ok": True, "target": target.describe()}
+
+    @app.post("/api/target/test")
+    async def test_target():
+        return await _test_destination(service.settings.defaults.destination)
+
+    @app.post("/api/destinations/{dest_id}/test")
+    async def test_destination(dest_id: str, credentials: str | None = None):
+        return await _test_destination(dest_id, credentials)
+
+    @app.get("/api/providers")
+    async def providers():
+        return [p.describe() for p in service.providers.values()]
+
+    @app.get("/api/effective")
+    async def effective(provider: str, device: str | None = None):
+        settings = service.settings
+        policy = settings.effective(provider, device)
+        dev = settings.device(device)
+        label = service.providers[provider].label if provider in service.providers else provider
+        model = (dev.config.get("model") if dev else None) or label
+        example = policy.key(template_fields(1790438400, label, (dev.name if dev else "") or model, model), "EXAMPLE.MP4")
+        try:
+            location = resolve_destination(settings, policy.destination, policy.credentials).describe(example)
+        except DestinationError as exc:
+            location = None
+            example = f"{example} ({exc})"
+        values = {k: getattr(policy, k) for k in policy.origin}
+        return {"policy": values, "origin": policy.origin, "example": example, "location": location}
+
+    # --- devices -----------------------------------------------------------
+
+    def _save_devices(change) -> dict:
+        try:
+            settings = service.settings_store.update(change)
+        except LookupError as exc:
+            raise HTTPException(404, str(exc))
+        except ValueError as exc:
+            raise _invalid(exc)
+        service.publish_status()
+        return _public(settings)
+
+    @app.post("/api/devices")
+    async def add_device(req: DeviceCreate):
+        provider = service.providers.get(req.provider)
+        if provider is None:
+            raise HTTPException(404, f"unknown provider {req.provider!r}")
+        try:
+            device = await provider.new_device(req.name, req.config)
+        except ValueError as exc:
+            raise _invalid(exc)
+        device.sync = req.sync
+
+        def add(settings: Settings) -> None:
+            if settings.device(device.id):
+                raise ValueError(f"{device.id} is already set up")
+            settings.devices.append(device)
+
+        data = _save_devices(add)
+        service.log("info", f"{provider.label} device added: {device.name or device.id}")
+        return data
+
+    @app.put("/api/devices/{device_id}")
+    async def update_device(device_id: str, req: DeviceUpdate):
+        def change(settings: Settings) -> None:
+            device = settings.device(device_id)
+            if device is None:
+                raise LookupError(f"unknown device {device_id!r}")
+            if req.name is not None:
+                device.name = req.name
+            if req.enabled is not None:
+                device.enabled = req.enabled
+            if req.sync is not None:
+                device.sync = req.sync
+            if req.config is not None:
+                device.config = {**device.config, **_unmask(dict(req.config), device.config)}
+
+        return _save_devices(change)
+
+    @app.delete("/api/devices/{device_id}")
+    async def delete_device(device_id: str):
+        def remove(settings: Settings) -> None:
+            if settings.device(device_id) is None:
+                raise LookupError(f"unknown device {device_id!r}")
+            settings.devices = [d for d in settings.devices if d.id != device_id]
+
+        return _save_devices(remove)
 
     # --- network discovery ---------------------------------------------
 
@@ -201,10 +333,10 @@ def create_app(service: SyncService, auth: AuthStore) -> FastAPI:
     async def discover_shares(req: SharesRequest):
         from . import discovery
 
-        smb = service.settings.smb
+        cred = service.settings.credential(req.credentials)
         # Reuse the saved credentials unless the form sends new ones.
-        username = smb.username if req.username is None else req.username
-        password = smb.password if req.password in (None, MASK) else req.password
+        username = (cred.username if cred else "") if req.username is None else req.username
+        password = (cred.password if cred else "") if req.password in (None, MASK) else req.password
         try:
             return await discovery.list_smb_shares(req.host, username, password)
         except discovery.DiscoveryError as exc:
@@ -247,12 +379,12 @@ def create_app(service: SyncService, auth: AuthStore) -> FastAPI:
     # --- library -----------------------------------------------------------
 
     @app.get("/api/library")
-    async def library(offset: int = 0, limit: int = 60):
-        items, total = service.store.library(max(offset, 0), min(max(limit, 1), 200))
+    async def library(offset: int = 0, limit: int = 60, provider: str | None = None):
+        items, total = service.store.library(max(offset, 0), min(max(limit, 1), 200), provider or None)
         for item in items:
             item["name"] = item["path"].rsplit("/", 1)[-1]
             item["thumb"] = (service.thumbs / thumb_name(item["dest"])).exists()
-        return {"items": items, "total": total}
+        return {"items": items, "total": total, "providers": service.store.library_providers()}
 
     def _item(item_id: int) -> dict:
         item = service.store.library_item(item_id)
@@ -271,7 +403,9 @@ def create_app(service: SyncService, auth: AuthStore) -> FastAPI:
     async def library_media(item_id: int, request: Request, download: bool = False):
         item = _item(item_id)
         try:
-            destination = make_destination(service.settings)
+            settings = service.settings
+            # Files synced before destinations existed live on the default one.
+            destination = resolve_destination(settings, item["dest_id"] or settings.defaults.destination, item["cred_id"])
             remote = await destination.stat(item["dest"])
         except (DestinationError, OSError) as exc:
             raise HTTPException(502, f"cannot open {item['dest']} on the destination: {exc}") from exc

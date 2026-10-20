@@ -7,13 +7,12 @@ import hashlib
 import shutil
 import time
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Awaitable, Callable
 
 from ..destinations import Destination, DestinationError
 from .media import MediaItem, MediaSource, SourceError
-from .settings import Settings
+from .settings import SyncPolicy, template_fields
 from .store import Store
 
 DOWNLOAD_ATTEMPTS = 4
@@ -52,13 +51,20 @@ class RunResult:
     skipped_existing: int
 
 
-def dest_rel(settings: Settings, label: str, media: MediaItem) -> str:
-    # The device clock has no timezone, so read the epoch back as naive wall time.
-    taken = datetime.fromtimestamp(media.created, tz=timezone.utc)
-    folder = settings.folder_template.format(
-        year=f"{taken:%Y}", month=f"{taken:%m}", day=f"{taken:%d}", date=f"{taken:%Y-%m-%d}", camera=label,
-    ).strip("/")
-    return f"{folder}/{media.name}" if folder else media.name
+@dataclass
+class DeviceInfo:
+    """Who is being offloaded: feeds the store keys and the path placeholders."""
+
+    provider: str  # provider kind, e.g. "gopro"
+    provider_label: str  # e.g. "GoPro"
+    id: str  # stable device id (serial number, volume UUID, ...)
+    model: str  # e.g. "HERO9 Black"
+    name: str = ""  # the user's name for the device; falls back to the model
+
+
+def dest_rel(policy: SyncPolicy, device: DeviceInfo, media: MediaItem) -> str:
+    fields = template_fields(media.created, device.provider_label, device.name or device.model, device.model)
+    return policy.key(fields, media.name)
 
 
 def thumb_name(rel: str) -> str:
@@ -71,21 +77,22 @@ def _with_suffix(rel: str, created: int) -> str:
 
 
 class SyncEngine:
-    def __init__(self, store: Store, settings: Settings, destination: Destination, staging: Path,
+    def __init__(self, store: Store, policy: SyncPolicy, destination: Destination, staging: Path,
                  log: Callable[[str, str], None], on_progress: Callable[[Progress], None],
                  thumbs: Path | None = None):
         self.store = store
         self.thumbs = thumbs
-        self.settings = settings
+        self.policy = policy
         self.destination = destination
         self.staging = staging
         self.log = log
         self.on_progress = on_progress
         self.progress = Progress()
 
-    async def run(self, source: MediaSource, device_id: str, label: str,
+    async def run(self, source: MediaSource, device: DeviceInfo,
                   keep_alive: Callable[[], Awaitable[None]] | None = None) -> RunResult:
-        staging = self.staging / device_id
+        device_id = device.id
+        staging = self.staging / device_id.replace(":", "_")
         staging.mkdir(parents=True, exist_ok=True)
 
         media = await source.list_media()
@@ -115,7 +122,7 @@ class SyncEngine:
         async def consumer() -> None:
             while (item := await queue.get()) is not None:
                 m, local, size = item
-                existed, rel = await self._upload(m, local, size, device_id, label)
+                existed, rel = await self._upload(m, local, size, device)
                 await self._save_thumbnail(source, m, rel)
                 local.unlink(missing_ok=True)
                 uploaded.append((m, size))
@@ -138,7 +145,7 @@ class SyncEngine:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
 
-        if self.settings.delete_after_sync:
+        if self.policy.delete_after_sync:
             # Only after every upload is verified, and while the device link is still up.
             self.progress.phase = "deleting"
             self._emit()
@@ -209,8 +216,8 @@ class SyncEngine:
         except Exception as exc:  # Thumbnails are cosmetic: never fail a sync over one.
             self.log("warning", f"no thumbnail for {m.name}: {exc}")
 
-    async def _upload(self, m: MediaItem, local: Path, size: int, device_id: str, label: str) -> tuple[bool, str]:
-        rel = dest_rel(self.settings, label, m)
+    async def _upload(self, m: MediaItem, local: Path, size: int, device: DeviceInfo) -> tuple[bool, str]:
+        rel = dest_rel(self.policy, device, m)
         self.progress.current_upload = rel
         self._emit()
         existing = await self.destination.stat(rel)
@@ -227,7 +234,9 @@ class SyncEngine:
             if remote is None or remote.size != size:
                 found = remote.size if remote else None
                 raise DestinationError(f"{rel}: target has {found} bytes, expected {size}")
-        self.store.mark_synced(device_id, m.path, m.created, _key_size(m), rel)
+        self.store.mark_synced(device.id, m.path, m.created, _key_size(m), rel,
+                               provider=device.provider, dest_id=self.policy.destination,
+                               cred_id=self.policy.credentials)
         self.progress.current_upload = ""
         return already_there, rel
 

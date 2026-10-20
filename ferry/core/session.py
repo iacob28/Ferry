@@ -26,6 +26,8 @@ class Session:
     provider: str = ""
     # Id of the device in settings.devices, once known; selects its sync rules.
     device: str | None = None
+    # Provider whose rules apply when not the session's own (a GoPro card in a USB card reader).
+    rules: str | None = None
 
     def snapshot(self) -> dict:
         return {

@@ -1,4 +1,4 @@
-"""A mounted DCIM volume as a MediaSource."""
+"""A mounted volume (camera storage or SD card) as a MediaSource."""
 
 from __future__ import annotations
 
@@ -31,18 +31,22 @@ def wall_clock(mtime: float, fstype: str) -> int:
 
 class FolderSource:
     def __init__(self, root: Path, fstype: str = "", extensions: tuple[str, ...] = DEFAULT_EXTENSIONS,
-                 make_writable: Callable[[], Awaitable[None]] | None = None):
+                 make_writable: Callable[[], Awaitable[None]] | None = None, media_dir: str = "DCIM",
+                 paths_from: str = ""):
         self.root = root
+        # Scanned folder, and the folder item paths are relative to (the device's own naming).
+        self.media_dir = root / media_dir
+        self.base = root / paths_from if paths_from else root
         self.fstype = fstype
         self.extensions = {e.lower().lstrip(".") for e in extensions}
         self._make_writable = make_writable
         self._writable = False
 
     def _scan(self) -> list[MediaItem]:
-        dcim = self.root / "DCIM"
+        top = self.media_dir
         items = []
-        for dirpath, dirnames, filenames in os.walk(dcim):
-            depth = len(Path(dirpath).relative_to(dcim).parts)
+        for dirpath, dirnames, filenames in os.walk(top):
+            depth = len(Path(dirpath).relative_to(top).parts)
             dirnames[:] = sorted(d for d in dirnames if not d.startswith(".")) if depth < MAX_DEPTH else []
             for name in sorted(filenames):
                 if name.startswith(".") or name.rsplit(".", 1)[-1].lower() not in self.extensions:
@@ -50,12 +54,12 @@ class FolderSource:
                 path = Path(dirpath) / name
                 st = path.stat()
                 created = time_from_name(name) or wall_clock(st.st_mtime, self.fstype)
-                items.append(MediaItem(str(path.relative_to(self.root)), name, created, st.st_size))
+                items.append(MediaItem(path.relative_to(self.base).as_posix(), name, created, st.st_size))
         return items
 
     async def list_media(self) -> list[MediaItem]:
-        if not (self.root / "DCIM").is_dir():
-            raise SourceError(f"{self.root} has no DCIM folder")
+        if not self.media_dir.is_dir():
+            raise SourceError(f"{self.root} has no {self.media_dir.name} folder")
         return await asyncio.to_thread(self._scan)
 
     def _copy(self, src: Path, dest: Path, on_bytes: Callable[[int], None]) -> int:
@@ -73,7 +77,7 @@ class FolderSource:
 
     async def download(self, item: MediaItem, dest: Path, on_bytes: Callable[[int], None]) -> int:
         try:
-            return await asyncio.to_thread(self._copy, self.root / item.path, dest, threadsafe(on_bytes))
+            return await asyncio.to_thread(self._copy, self.base / item.path, dest, threadsafe(on_bytes))
         except OSError as exc:  # A drive unplugged mid-copy.
             raise SourceError(f"reading {item.path} failed: {exc}") from exc
 
@@ -85,12 +89,12 @@ class FolderSource:
                 raise SourceError(f"cannot make the volume writable: {exc}") from exc
             self._writable = True
         try:
-            (self.root / item.path).unlink()
+            (self.base / item.path).unlink()
         except OSError as exc:
             raise SourceError(str(exc)) from exc
 
     async def thumbnail(self, item: MediaItem) -> bytes:
-        path = self.root / item.path
+        path = self.base / item.path
         ext = item.name.rsplit(".", 1)[-1].lower()
         if ext in VIDEO:
             # Some cameras write a small preview next to each clip.

@@ -62,13 +62,20 @@ async def _blkid(device: str) -> dict[str, str]:
     return dict(line.split("=", 1) for line in out.splitlines() if "=" in line)
 
 
-async def block_candidates() -> list[Candidate]:
+async def block_candidates(sd_slot: bool = False) -> list[Candidate]:
+    """USB disks and card readers; with sd_slot, also the host's built-in SD slot (mmcblk).
+
+    The built-in slot is opt-in: on a Raspberry Pi that boots from its SD card it holds the
+    system. Even then only FAT/exFAT/NTFS volumes with camera media are ever used.
+    """
     if sys.platform != "linux" or not SYS_BLOCK.exists():
         return []
     found: list[Candidate] = []
-    for disk in sorted(SYS_BLOCK.glob("sd*")):
-        usb = _usb_parent(disk / "device")
-        if usb is None or _read(disk / "size") in ("", "0"):
+    disks = sorted(SYS_BLOCK.glob("sd*")) + (sorted(SYS_BLOCK.glob("mmcblk[0-9]")) if sd_slot else [])
+    for disk in disks:
+        builtin = disk.name.startswith("mmcblk")
+        usb = None if builtin else _usb_parent(disk / "device")
+        if (usb is None and not builtin) or _read(disk / "size") in ("", "0"):
             continue  # Not USB, or a card reader without a card.
         partitions = sorted(p for p in disk.iterdir() if p.name.startswith(disk.name) and (p / "partition").exists())
         for part in partitions or [disk]:
@@ -77,23 +84,25 @@ async def block_candidates() -> list[Candidate]:
             fstype = info.get("TYPE", "")
             if fstype not in MEDIA_FILESYSTEMS:
                 continue
-            uuid = info.get("UUID") or f"{_read(usb / 'serial')}-{part.name}"
+            serial = _read(usb / "serial") if usb else _read(disk / "device" / "serial")
+            uuid = info.get("UUID") or f"{serial}-{part.name}"
             found.append(Candidate(
                 id=f"usb:{uuid}", source=device, kind="block", label=info.get("LABEL", ""), fstype=fstype,
-                vendor=_read(usb / "idVendor"), product=_read(usb / "product"), serial=_read(usb / "serial"),
+                vendor=_read(usb / "idVendor") if usb else "", product=_read(usb / "product") if usb else "SD card",
+                serial=serial,
             ))
     return found
 
 
 def dir_candidates(roots: list[str]) -> list[Candidate]:
-    """Already-mounted volumes: every folder with a DCIM directory under one of the roots."""
+    """Already-mounted volumes: every folder with camera media (DCIM, or a printer's timelapse) under a root."""
     found = []
     for root in roots:
         base = Path(root)
         if not base.is_dir():
             continue
         for child in [base, *sorted(p for p in base.iterdir() if p.is_dir())]:
-            if (child / "DCIM").is_dir():
+            if (child / "DCIM").is_dir() or (child / "timelapse").is_dir():
                 digest = hashlib.sha1(str(child.resolve()).encode()).hexdigest()[:12]
                 found.append(Candidate(id=f"dir:{digest}", source=str(child), kind="dir", label=child.name))
     return found

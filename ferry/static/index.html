@@ -616,13 +616,14 @@ const I18N = {
     opt_gopro_ble: "Automatic wireless sync", opt_gopro_ble_d: "Starts when a paired camera is switched on nearby.",
     opt_gopro_sleep_after_sync: "Standby when done", opt_gopro_sleep_after_sync_d: "Puts the camera to sleep after a wireless sync.",
     opt_gopro_cooldown_minutes: "Wireless pause", opt_gopro_cooldown_minutes_d: "Minutes between wireless syncs of the same camera.",
-    provider_usbstorage: "USB drones & cameras", adopt: "Adopt", adoptSync: "Adopt and sync", newDrive: "New",
-    noDrives: "Nothing plugged in. Connect a drone or camera with its USB cable (DJI Neo: USB-C), or an SD card reader.",
+    provider_usbstorage: "USB drones & cameras", cardOf: "{p} card, synced with the {p} rules", adopt: "Adopt", adoptSync: "Adopt and sync", newDrive: "New",
+    noDrives: "Nothing plugged in. Connect a drone or camera with its USB cable (DJI Neo: USB-C), or put its SD card in a card reader: GoPro cards sync as their camera, a Bambu card as the printer.",
     knownDrives: "Known drives", vol_checking: "Checking", vol_ready: "Connected", vol_done: "Synced, safe to unplug", vol_error: "Error",
     opt_usbstorage_auto: "Sync when plugged in", opt_usbstorage_auto_d: "Adopted drives start syncing as soon as they are connected.",
     opt_usbstorage_auto_adopt: "Adopt new drives automatically", opt_usbstorage_auto_adopt_d: "Otherwise a new drive waits until you adopt it here.",
     opt_usbstorage_watch_folders: "Watch folders", opt_usbstorage_watch_folders_d: "Folders where the host already mounts drives, for example /media. Each sub-folder with a DCIM folder counts as a drive.",
     opt_usbstorage_extensions: "File types", opt_usbstorage_extensions_d: "Extensions to copy. Proxies (LRF, LRV) and thumbnails stay on the device.",
+    opt_usbstorage_sd_slot: "Built-in SD slot", opt_usbstorage_sd_slot_d: "Also watch the server's own SD slot (needs the b 179:* device rule). Leave off on a Raspberry Pi that boots from its SD card.",
     addPrinter: "Add printer", findPrinters: "Find printers on the network", searchingPrinters: "Listening for printers…",
     printersFound: "{n} printer(s) found", noPrintersFound: "No printer answered. Check that it is on and on the same network, or enter it by hand.",
     noPrinters: "No printer yet. Add one with its IP address and LAN access code.", printerAdded: "Printer added",
@@ -714,13 +715,14 @@ const I18N = {
     opt_gopro_ble: "Sincronizare automată wireless", opt_gopro_ble_d: "Pornește când o cameră asociată e pornită în apropiere.",
     opt_gopro_sleep_after_sync: "Standby la final", opt_gopro_sleep_after_sync_d: "Oprește camera după o sincronizare wireless.",
     opt_gopro_cooldown_minutes: "Pauză wireless", opt_gopro_cooldown_minutes_d: "Minute între două sincronizări wireless ale aceleiași camere.",
-    provider_usbstorage: "Drone și camere USB", adopt: "Adoptă", adoptSync: "Adoptă și sincronizează", newDrive: "Nou",
-    noDrives: "Nimic conectat. Conectează o dronă sau o cameră prin cablul USB (DJI Neo: USB-C) ori un cititor de carduri SD.",
+    provider_usbstorage: "Drone și camere USB", cardOf: "card {p}, sincronizat după regulile {p}", adopt: "Adoptă", adoptSync: "Adoptă și sincronizează", newDrive: "Nou",
+    noDrives: "Nimic conectat. Conectează o dronă sau o cameră prin cablul USB (DJI Neo: USB-C), ori pune cardul SD într-un cititor: cardurile GoPro se sincronizează ca și camera lor, cel Bambu ca imprimanta.",
     knownDrives: "Dispozitive cunoscute", vol_checking: "Se verifică", vol_ready: "Conectat", vol_done: "Sincronizat, poate fi deconectat", vol_error: "Eroare",
     opt_usbstorage_auto: "Sincronizează la conectare", opt_usbstorage_auto_d: "Dispozitivele adoptate încep sincronizarea imediat ce sunt conectate.",
     opt_usbstorage_auto_adopt: "Adoptă automat dispozitivele noi", opt_usbstorage_auto_adopt_d: "Altfel, un dispozitiv nou așteaptă până îl adopți aici.",
     opt_usbstorage_watch_folders: "Foldere urmărite", opt_usbstorage_watch_folders_d: "Foldere unde serverul montează deja unitățile, de exemplu /media. Fiecare subfolder cu DCIM contează ca unitate.",
     opt_usbstorage_extensions: "Tipuri de fișiere", opt_usbstorage_extensions_d: "Extensiile copiate. Fișierele proxy (LRF, LRV) și miniaturile rămân pe dispozitiv.",
+    opt_usbstorage_sd_slot: "Slotul SD încorporat", opt_usbstorage_sd_slot_d: "Urmărește și slotul SD al serverului (necesită regula de dispozitiv b 179:*). Lasă-l oprit pe un Raspberry Pi care pornește de pe cardul SD.",
     addPrinter: "Adaugă imprimantă", findPrinters: "Caută imprimante în rețea", searchingPrinters: "Se ascultă imprimantele…",
     printersFound: "{n} imprimante găsite", noPrintersFound: "Nicio imprimantă n-a răspuns. Verifică dacă e pornită și în aceeași rețea, sau introdu-o manual.",
     noPrinters: "Nicio imprimantă încă. Adaug-o cu adresa IP și codul de acces LAN.", printerAdded: "Imprimanta a fost adăugată",
@@ -905,12 +907,12 @@ const PROVIDER_UI = {
       const dev = settings?.devices?.find((d) => d.id === v.device);
       const state = v.syncing ? t("syncingNow") : v.state === "error" ? `${t("vol_error")}: ${v.error}` : t(`vol_${v.state}`);
       const actions = v.syncing ? syncingTag()
-        : dev ? `${syncBtn(v.id, "usb")}${deviceBtn(dev)}`
+        : !v.adopt ? `${syncBtn(v.id, "usb")}${dev ? deviceBtn(dev) : ""}`
         : `<button type="button" class="btn sm" data-adopt="${esc(v.id)}">${esc(t("adopt"))}</button>
            <button type="button" class="btn primary sm" data-sync="${esc(v.id)}" data-mode="usb"><i class="ph ph-arrows-clockwise"></i>${esc(t("adoptSync"))}</button>`;
       return `<div class="device"><div class="ico"><i class="ph ${esc(v.icon)}"></i></div>
-        <div class="meta"><div class="name">${esc(dev?.name || v.model)}${dev ? "" : ` <span class="tag warn">${esc(t("newDrive"))}</span>`}</div>
-        <div class="sub">${esc(state)}${v.label ? `, ${esc(v.label)}` : ""}</div></div>${actions}</div>`;
+        <div class="meta"><div class="name">${esc(dev?.name || v.model)}${v.adopt ? ` <span class="tag warn">${esc(t("newDrive"))}</span>` : ""}</div>
+        <div class="sub">${esc(state)}${v.rules !== "usbstorage" ? ` · ${esc(t("cardOf", { p: providerInfo(v.rules).label }))}` : ""}${v.label ? `, ${esc(v.label)}` : ""}</div></div>${actions}</div>`;
     }).join("");
     const offline = devicesOf("usbstorage").filter((d) => !connected.has(d.id));
     return `<div class="devices">${rows || `<div class="empty"><i class="ph ph-usb"></i>${esc(t("noDrives"))}</div>`}</div>

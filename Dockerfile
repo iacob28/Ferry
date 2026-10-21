@@ -8,12 +8,15 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md LICENSE ./
 COPY ferry ./ferry
 RUN pip install --no-cache-dir ".[media]"
 
 LABEL org.opencontainers.image.title="Ferry" \
-      org.opencontainers.image.description="Offload cameras, drones and 3D printers to network storage"
+      org.opencontainers.image.description="Offload cameras, drones and 3D printers to network storage" \
+      org.opencontainers.image.source="https://github.com/iacob28/Ferry" \
+      org.opencontainers.image.url="https://github.com/iacob28/Ferry" \
+      org.opencontainers.image.licenses="MIT"
 
 ENV FERRY_DATA=/data \
     FERRY_PORT=8780 \

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4cb5f5"/>
+      <stop offset="1" stop-color="#0866b8"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".3" cy=".2" r=".8">
+      <stop offset="0" stop-color="#fff" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <mask id="windows">
+      <rect width="512" height="512" fill="#fff"/>
+      <rect x="182" y="238" width="28" height="22" rx="6"/>
+      <rect x="226" y="238" width="28" height="22" rx="6"/>
+      <rect x="270" y="238" width="28" height="22" rx="6"/>
+      <rect x="314" y="238" width="28" height="22" rx="6"/>
+      <rect x="216" y="184" width="78" height="18" rx="5"/>
+    </mask>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="116" fill="url(#glow)"/>
+  <g fill="#fff" mask="url(#windows)">
+    <path d="M296 118 h30 a6 6 0 0 1 6 7 l-6 41 h-36 l0 -42 a6 6 0 0 1 6 -6 z"/>
+    <rect x="198" y="168" width="134" height="48" rx="14"/>
+    <rect x="164" y="224" width="200" height="52" rx="14"/>
+    <path d="M90 288 H424 L384 352 Q377 364 363 364 H150 Q136 364 129 353 Z"/>
+  </g>
+  <path d="M100 404 q39 -24 78 0 t78 0 t78 0 t78 0" fill="none" stroke="#fff" stroke-linecap="round" stroke-width="16" opacity=".85"/>
+</svg>

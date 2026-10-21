@@ -1,6 +1,6 @@
 services:
   ferry:
-    image: ${FERRY_IMAGE:-harbor.dockerbit.com/ferry/ferry}:${FERRY_TAG:-latest}
+    image: ${FERRY_IMAGE:-ghcr.io/iacob28/ferry}:${FERRY_TAG:-latest}
     container_name: ferry
     restart: unless-stopped
     # Host networking: the service must see USB network devices (GoPro), drive the

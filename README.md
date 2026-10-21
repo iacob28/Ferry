@@ -1,9 +1,25 @@
-# Ferry
+<p align="center">
+  <img src="docs/logo.svg" alt="" width="112">
+</p>
 
-**Automatic offload for the devices that fill up with media.** Plug in a camera, drone or
-SD card, or simply switch a paired GoPro on near the server. Ferry copies every new photo,
-video and print timelapse to your NAS or cloud, checks that each file arrived intact, and can
-then free up the device.
+<h1 align="center">Ferry</h1>
+
+<p align="center">
+  <strong>Automatic offload for the devices that fill up with media.</strong><br>
+  GoPro, DJI, Insta360 and Bambu Lab, to your NAS or cloud, verified.
+</p>
+
+<p align="center">
+  <a href="https://github.com/iacob28/Ferry/actions/workflows/ci.yml"><img src="https://github.com/iacob28/Ferry/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/iacob28/Ferry/releases/latest"><img src="https://img.shields.io/github/v/release/iacob28/Ferry?color=0a84d6" alt="Latest release"></a>
+  <a href="https://github.com/iacob28/Ferry/pkgs/container/ferry"><img src="https://img.shields.io/badge/ghcr.io-iacob28%2Fferry-0a84d6?logo=docker&logoColor=white" alt="Container image"></a>
+  <img src="https://img.shields.io/badge/arch-arm64%20%7C%20amd64-555" alt="arm64 and amd64">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/iacob28/Ferry?color=555" alt="MIT license"></a>
+</p>
+
+Plug in a camera, drone or SD card, or simply switch a paired GoPro on near the server. Ferry
+copies every new photo, video and print timelapse to your NAS or cloud, checks that each file
+arrived intact, and can then free up the device.
 
 It runs as a single Docker container on a small Linux box, such as a Raspberry Pi, and you
 manage it from a web UI on your phone or laptop.
@@ -71,23 +87,29 @@ You need a Linux host with Docker. A Raspberry Pi 4 or 5 is ideal. For wireless 
 offload you also need BlueZ (`sudo apt install bluez`).
 
 ```bash
-git clone https://github.com/iacob28/Ferry.git && cd Ferry
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+mkdir ferry && cd ferry
+curl -fsSLO https://raw.githubusercontent.com/iacob28/Ferry/main/docker-compose.yml
+docker compose up -d
 ```
 
 Open `http://<host>:8780`, create the admin password and add a destination. Then plug a
 device in. Settings and state live in `./data`.
 
-To run a prebuilt image instead, set `FERRY_IMAGE` (and `FERRY_TAG`) to wherever you publish
-it, and use `docker compose up -d`. `scripts/release.sh` builds and pushes a multi-arch
-(arm64 and amd64) image.
+The image, `ghcr.io/iacob28/ferry`, is built for arm64 and amd64. To update, run
+`docker compose pull && docker compose up -d`. To pin a release, set `FERRY_TAG` (for example
+`FERRY_TAG=0.3.5`). To build from source instead:
+
+```bash
+git clone https://github.com/iacob28/Ferry.git && cd Ferry
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+```
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `FERRY_PORT` | `8780` | Web UI port |
 | `FERRY_PASSWORD` | | Preset the admin password (otherwise set it in the browser) |
 | `FERRY_DATA` | `./data` | Host folder for settings, state and staging |
-| `FERRY_IMAGE` / `FERRY_TAG` | author's private registry / `latest` | Image to run with plain `docker compose up -d` |
+| `FERRY_IMAGE` / `FERRY_TAG` | `ghcr.io/iacob28/ferry` / `latest` | Image to run, e.g. a mirror or a pinned release |
 | `TZ` | `UTC` | Time zone for logs and for cameras that do not store one |
 
 **Wireless GoPro offload needs a Wi-Fi radio that is not the host's own network
@@ -264,7 +286,7 @@ uv venv && uv pip install -e ".[dev,media]"
 .venv/bin/pytest
 FERRY_DATA=./.dev-data .venv/bin/python -m ferry   # http://localhost:8780
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
-scripts/release.sh   # multi-arch build and push (IMAGE=... to override)
+scripts/release.sh   # manual multi-arch build and push (IMAGE=... to override)
 ```
 
 On macOS the app runs natively for USB offload and UI work. Docker Desktop cannot reach USB
@@ -275,6 +297,16 @@ network devices or Bluetooth, so the container is meant for Linux hosts.
 Ferry was called GoPro Sync until 0.2.0, and its data folder is compatible: point
 `FERRY_DATA` at the old one and nothing is synced twice. The old `GOPRO_SYNC_*` variables are
 still read when the `FERRY_*` ones are not set.
+
+## Contributing
+
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for where new
+devices and destinations go, and how releases are made. Report security issues privately, as
+described in [SECURITY.md](SECURITY.md).
+
+## License
+
+[MIT](LICENSE)
 
 ## Credits
 

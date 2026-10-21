@@ -1,0 +1,20 @@
+name: Feature or device request
+description: A new device, destination or improvement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What would you like Ferry to do
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: The situation where you need it.
+  - type: textarea
+    id: device
+    attributes:
+      label: Device details
+      description: For a new device, how it connects (USB storage, Wi-Fi, LAN protocol) and its folder layout if you know it.

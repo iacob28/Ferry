@@ -1,0 +1,40 @@
+name: Bug report
+description: Something does not sync, crashes or looks wrong
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what Ferry did instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Ferry version
+      description: Shown under Settings, or the image tag you run.
+      placeholder: 0.3.5
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and connection
+      placeholder: GoPro HERO11 over Wi-Fi, DJI Neo over USB, Bambu P1S...
+  - type: input
+    id: destination
+    attributes:
+      label: Destination
+      placeholder: SMB on Synology DSM 7.2, Cloudflare R2...
+  - type: input
+    id: host
+    attributes:
+      label: Host
+      placeholder: Raspberry Pi 5, Debian 12, Docker 27
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log
+      description: From Activity > Log, or `docker logs ferry`. Remove anything private.
+      render: text

@@ -1,4 +1,4 @@
-FROM python:3.12-slim-bookworm
+FROM python:3.15-slim-bookworm
 
 # wpasupplicant/udhcpc/iproute2/iw join camera access points; smbclient and nfs-common
 # list shares during network discovery. BLE goes through the host's bluetoothd over
